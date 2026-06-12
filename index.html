@@ -1,20 +1,61 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Harlem Empire Online</title>
-<link rel="stylesheet" href="style.css">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Harlem Empire</title>
+<link rel="stylesheet" href="./style.css" />
+
+<!-- Three.js + addons via importmap (HTTPS CDN = GitHub Pages safe) -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
 </head>
 <body>
 
-<div id="loading">
-  Harlem Empire Online Loading...
+<!-- LOADING SCREEN (removed after assets load) -->
+<div id="loader">
+  <div class="loader-inner">
+    <h1>HARLEM EMPIRE</h1>
+    <div class="loader-sub">NEW HARLEM &middot; 1983</div>
+    <div id="bar-wrap"><div id="bar"></div></div>
+    <div id="loader-status">Loading the city&hellip;</div>
+  </div>
 </div>
 
-<canvas id="gameCanvas"></canvas>
+<!-- GAME CANVAS -->
+<canvas id="game"></canvas>
 
-<script src="script.js"></script>
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div id="stats">
+    <div class="panel">
+      <div class="lbl">Health</div>
+      <div class="val" id="health-val">100</div>
+      <div class="bar"><div class="fill" id="health-fill"></div></div>
+    </div>
+    <div class="panel">
+      <div class="lbl">Cash</div>
+      <div class="val" id="cash-val">$0</div>
+    </div>
+  </div>
 
+  <div id="minimap-wrap">
+    <div class="mm-lbl">NEW HARLEM</div>
+    <canvas id="minimap" width="180" height="180"></canvas>
+  </div>
+
+  <div id="controls-hint">
+    WASD move &middot; SHIFT sprint &middot; SPACE jump &middot; click to look &middot; O orbit cam
+  </div>
+</div>
+
+<!-- Game logic (ES module) -->
+<script type="module" src="./script.js"></script>
 </body>
 </html>
