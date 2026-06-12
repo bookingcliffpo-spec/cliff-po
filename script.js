@@ -104,6 +104,53 @@ loader.load(
 
   }
 );
+const cars = [];
+loader.load(
+  "./assets/car.glb",
+
+  (gltf) => {
+
+    const baseCar = gltf.scene;
+
+    baseCar.scale.set(
+  0.05,
+  0.05,
+  0.05
+);
+
+    for (let i = 0; i < 10; i++) {
+
+      const car = baseCar.clone(true);
+
+      car.position.set(
+        (Math.random() - 0.5) * 180,
+        0,
+        (Math.random() - 0.5) * 180
+      );
+
+      car.rotation.y =
+        Math.random() * Math.PI * 2;
+
+      scene.add(car);
+
+      cars.push(car);
+
+    }
+
+    console.log("CAR GLB LOADED");
+
+  },
+
+  undefined,
+
+  (error) => {
+
+    console.log("CAR FAILED");
+
+    console.error(error);
+
+  }
+);
 function bind(id, key) {
   const b = document.getElementById(id);
   if (!b) return;
