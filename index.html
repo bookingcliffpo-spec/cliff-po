@@ -1,13 +1,26 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>Harlem Empire Online</title>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-  <div id="hud">HARLEM EMPIRE ONLINE</div>
+  <div id="hud">
+    <div>HARLEM EMPIRE ONLINE</div>
+    <div class="small">WASD / ARROWS MOVE • SHIFT SPRINT</div>
+  </div>
+
+  <div id="mobileControls">
+    <button id="up">↑</button>
+    <div>
+      <button id="left">←</button>
+      <button id="down">↓</button>
+      <button id="right">→</button>
+    </div>
+  </div>
+
   <canvas id="game"></canvas>
 
   <script type="module" src="./script.js"></script>
