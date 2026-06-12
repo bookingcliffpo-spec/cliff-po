@@ -67,7 +67,43 @@ player.add(legs);
 const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 24), mat(0x6b3f22));
 head.position.y = 2.1;
 player.add(head);
+loader.load(
+  "./assets/player.glb",
 
+  (gltf) => {
+
+    const model = gltf.scene;
+
+    model.scale.set(
+      0.015,
+      0.015,
+      0.015
+    );
+
+    model.position.set(
+      0,
+      0,
+      0
+    );
+
+    player.clear();
+
+    player.add(model);
+
+    console.log("PLAYER GLB LOADED");
+
+  },
+
+  undefined,
+
+  (error) => {
+
+    console.log("PLAYER FAILED");
+
+    console.error(error);
+
+  }
+);
 function bind(id, key) {
   const b = document.getElementById(id);
   if (!b) return;
