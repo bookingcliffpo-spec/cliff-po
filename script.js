@@ -1,26 +1,44 @@
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.164/build/three.module.js';
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+const scene = new THREE.Scene();
 
-let x = 300;
-let y = 300;
+const camera = new THREE.PerspectiveCamera(
+  75,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
 
-document.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowUp") y -= 10;
-  if (e.key === "ArrowDown") y += 10;
-  if (e.key === "ArrowLeft") x -= 10;
-  if (e.key === "ArrowRight") x += 10;
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+
+renderer.setSize(window.innerWidth, window.innerHeight);
+
+document.body.appendChild(renderer.domElement);
+
+const geometry = new THREE.BoxGeometry();
+
+const material = new THREE.MeshStandardMaterial({
+  color: 0xffd700
 });
 
-function gameLoop() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+const cube = new THREE.Mesh(geometry, material);
 
-  ctx.fillStyle = "gold";
-  ctx.fillRect(x, y, 50, 50);
+scene.add(cube);
 
-  requestAnimationFrame(gameLoop);
+const light = new THREE.DirectionalLight(0xffffff, 2);
+
+light.position.set(5, 10, 5);
+
+scene.add(light);
+
+camera.position.z = 5;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  cube.rotation.y += 0.01;
+
+  renderer.render(scene, camera);
 }
 
-gameLoop();
+animate();
