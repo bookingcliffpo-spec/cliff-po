@@ -1,13 +1,12 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js";
 
 const canvas = document.getElementById("game");
-
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
 
 const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 1000);
-
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
+
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(1);
 
@@ -20,8 +19,8 @@ scene.add(sun);
 const keys = {};
 const touchKeys = {};
 
-window.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
-window.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
 
 function mat(color) {
   return new THREE.MeshStandardMaterial({ color });
@@ -45,10 +44,6 @@ for (let i = -4; i <= 4; i++) {
   box(300, 0.08, 4, 0x888888, 0, 0.08, i * 34 - 9);
 }
 
-for (let i = -120; i <= 120; i += 18) {
-  box(0.35, 0.08, 5, 0xe8c64a, 0, 0.12, i);
-}
-
 for (let x = -102; x <= 102; x += 34) {
   for (let z = -102; z <= 102; z += 34) {
     if (Math.abs(x) < 30 && Math.abs(z) < 30) continue;
@@ -58,7 +53,6 @@ for (let x = -102; x <= 102; x += 34) {
 }
 
 const player = new THREE.Group();
-player.position.set(0, 0, 0);
 scene.add(player);
 
 const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.1, 0.4), mat(0x111111));
@@ -73,15 +67,20 @@ const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 24), mat(0x6b3f22
 head.position.y = 2.1;
 player.add(head);
 
-const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.16, 24), mat(0x050505));
-cap.position.y = 2.42;
-player.add(cap);
-
 function bind(id, key) {
   const b = document.getElementById(id);
   if (!b) return;
-  b.addEventListener("touchstart", e => { e.preventDefault(); touchKeys[key] = true; });
-  b.addEventListener("touchend", e => { e.preventDefault(); touchKeys[key] = false; });
+
+  b.addEventListener("touchstart", e => {
+    e.preventDefault();
+    touchKeys[key] = true;
+  });
+
+  b.addEventListener("touchend", e => {
+    e.preventDefault();
+    touchKeys[key] = false;
+  });
+
   b.addEventListener("mousedown", () => touchKeys[key] = true);
   b.addEventListener("mouseup", () => touchKeys[key] = false);
 }
@@ -98,18 +97,10 @@ function pressed(k) {
 function update() {
   const speed = pressed("shift") ? 0.55 : 0.3;
 
-  let mx = 0;
-  let mz = 0;
-
-  if (pressed("w") || keys.arrowup || pressed("up")) mz -= speed;
-  if (pressed("s") || keys.arrowdown || pressed("down")) mz += speed;
-  if (pressed("a") || keys.arrowleft || pressed("left")) mx -= speed;
-  if (pressed("d") || keys.arrowright || pressed("right")) mx += speed;
-
-  player.position.x += mx;
-  player.position.z += mz;
-
-  if (mx || mz) player.rotation.y = Math.atan2(mx, mz);
+  if (pressed("w") || keys.arrowup || pressed("up")) player.position.z -= speed;
+  if (pressed("s") || keys.arrowdown || pressed("down")) player.position.z += speed;
+  if (pressed("a") || keys.arrowleft || pressed("left")) player.position.x -= speed;
+  if (pressed("d") || keys.arrowright || pressed("right")) player.position.x += speed;
 
   camera.position.lerp(player.position.clone().add(new THREE.Vector3(0, 5, 9)), 0.22);
   camera.lookAt(player.position.x, 1.5, player.position.z);
@@ -124,7 +115,7 @@ function animate() {
 camera.position.set(0, 5, 9);
 animate();
 
-window.addEventListener("resize", () => {
+addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
