@@ -1,4 +1,5 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js";
+import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/loaders/GLTFLoader.js";";
 
 const canvas = document.getElementById("game");
 const scene = new THREE.Scene();
@@ -18,7 +19,7 @@ scene.add(sun);
 
 const keys = {};
 const touchKeys = {};
-
+const loader = new GLTFLoader();
 addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
 addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
 
@@ -113,6 +114,23 @@ function animate() {
 }
 
 camera.position.set(0, 5, 9);
+loader.load("./assets/building.glb", (gltf) => {
+  const model = gltf.scene;
+
+  model.scale.set(0.05, 0.05, 0.05);
+
+  for (let x = -100; x <= 100; x += 40) {
+    for (let z = -100; z <= 100; z += 40) {
+      if (Math.abs(x) < 30 && Math.abs(z) < 30) continue;
+
+      const building = model.clone(true);
+      building.position.set(x, 0, z);
+      scene.add(building);
+    }
+  }
+
+  console.log("building.glb loaded");
+});
 animate();
 
 addEventListener("resize", () => {
