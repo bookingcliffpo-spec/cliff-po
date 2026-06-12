@@ -1,111 +1,50 @@
-html, body {
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  background: #87ceeb;
-  width: 100%;
-  height: 100%;
-  touch-action: none;
-  font-family: Arial, sans-serif;
+html,body{
+  margin:0;
+  padding:0;
+  overflow:hidden;
+  background:#87ceeb;
+  width:100%;
+  height:100%;
+  touch-action:none;
+  font-family:Arial,sans-serif;
 }
-
-#game {
-  width: 100vw;
-  height: 100vh;
-  display: block;
+#game{width:100vw;height:100vh;display:block}
+#mission{
+  position:fixed;top:25px;left:25px;z-index:10;
+  color:white;background:rgba(0,0,0,.55);
+  padding:14px 18px;border-radius:8px;
+  font-weight:900;font-size:18px;line-height:1.5;
+  text-shadow:2px 2px 4px #000;
 }
-
-#hud {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 10;
-  color: white;
-  text-shadow: 2px 2px 5px #000;
+#mission span{font-weight:400}
+#stats{
+  position:fixed;top:25px;right:25px;z-index:10;
+  color:white;text-align:right;font-size:22px;font-weight:900;
+  text-shadow:2px 2px 4px #000;
 }
-
-#mission {
-  position: absolute;
-  top: 22px;
-  left: 18px;
-  background: rgba(0,0,0,.55);
-  padding: 12px 16px;
-  border-radius: 6px;
-  font-size: 14px;
-  line-height: 1.6;
+.money{color:#59ff62;font-size:34px}
+.stars{font-size:34px;letter-spacing:4px}
+#mini{
+  position:fixed;left:25px;bottom:25px;z-index:10;
+  width:150px;height:150px;border-radius:50%;
+  border:5px solid rgba(0,0,0,.75);
+  background:rgba(30,30,30,.8);
 }
-
-#stats {
-  position: absolute;
-  top: 18px;
-  right: 18px;
-  text-align: right;
-  font-size: 18px;
-  font-weight: 900;
+#controls{
+  position:fixed;right:25px;bottom:35px;z-index:10;
+  color:white;background:rgba(0,0,0,.45);
+  padding:12px 18px;border-radius:8px;
+  font-size:16px;line-height:1.6;text-shadow:2px 2px 4px #000;
 }
-
-.money {
-  color: #39ff5a;
-  font-size: 25px;
+#mobile{
+  position:fixed;left:25px;bottom:190px;z-index:20;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
 }
-
-.stars {
-  font-size: 26px;
-  letter-spacing: 3px;
+#mobile div{display:flex;gap:8px}
+#mobile button{
+  width:60px;height:60px;border-radius:50%;
+  border:3px solid rgba(255,255,255,.6);
+  background:rgba(0,0,0,.45);color:white;
+  font-size:30px;font-weight:bold;
 }
-
-#miniMap {
-  position: absolute;
-  left: 18px;
-  bottom: 24px;
-  width: 150px;
-  height: 150px;
-  border-radius: 50%;
-  border: 4px solid rgba(0,0,0,.75);
-  background: rgba(30,30,30,.85);
-}
-
-#controlsText {
-  position: fixed;
-  right: 18px;
-  bottom: 30px;
-  color: white;
-  z-index: 15;
-  font-size: 14px;
-  line-height: 1.7;
-  text-shadow: 2px 2px 5px #000;
-  background: rgba(0,0,0,.35);
-  padding: 12px;
-  border-radius: 8px;
-}
-
-#mobileControls {
-  position: fixed;
-  left: 18px;
-  bottom: 190px;
-  z-index: 20;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
-}
-
-#mobileControls button {
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  border: 2px solid rgba(255,255,255,.6);
-  background: rgba(0,0,0,.45);
-  color: white;
-  font-size: 28px;
-  font-weight: bold;
-}
-
-#mobileControls div {
-  display: flex;
-  gap: 8px;
-}
-
-@media (min-width: 800px) {
-  #mobileControls { display: none; }
-}
+@media(min-width:900px){#mobile{display:none}}
