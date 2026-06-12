@@ -231,7 +231,10 @@ function createFallbackPlayer() {
 
 function loadPlayerModel() {
   loader.load(
-    "./assets/player.glb",
+(error) => {
+  console.error("PLAYER FAILED TO LOAD", error);
+  createFallbackPlayer();
+}    "./assets/player.glb",
     (gltf) => {
       playerModel = gltf.scene;
       playerModel.scale.set(1, 1, 1);
