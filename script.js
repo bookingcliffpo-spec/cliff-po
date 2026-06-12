@@ -19,6 +19,8 @@ scene.add(sun);
 
 const keys = {};
 const touchKeys = {};
+const cars = [];
+const npcs = [];
 const loader = new GLTFLoader();
 addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
 addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
@@ -107,7 +109,53 @@ loader.load(
 const cars = [];
 loader.load(
   "./assets/car.glb",
+loader.load(
+  "./assets/npc.glb",
 
+  (gltf) => {
+
+    const baseNPC = gltf.scene;
+
+    baseNPC.scale.set(
+  0.05,
+  0.05,
+  0.05
+);
+
+    for (let i = 0; i < 20; i++) {
+
+      const npc = baseNPC.clone(true);
+
+      npc.position.set(
+        (Math.random() - 0.5) * 160,
+        0,
+        (Math.random() - 0.5) * 160
+      );
+
+      npc.userData = {
+        direction: Math.random() * Math.PI * 2,
+        speed: 0.03 + Math.random() * 0.02
+      };
+
+      scene.add(npc);
+      npcs.push(npc);
+
+    }
+
+    console.log("NPC GLB LOADED");
+
+  },
+
+  undefined,
+
+  (error) => {
+
+    console.log("NPC FAILED");
+
+    console.error(error);
+
+  }
+);
   (gltf) => {
 
     const baseCar = gltf.scene;
@@ -189,7 +237,27 @@ function update() {
   camera.position.lerp(player.position.clone().add(new THREE.Vector3(0, 5, 9)), 0.22);
   camera.lookAt(player.position.x, 1.5, player.position.z);
 }
+for (const npc of npcs) {
 
+  npc.position.x +=
+    Math.sin(npc.userData.direction) *
+    npc.userData.speed;
+
+  npc.position.z +=
+    Math.cos(npc.userData.direction) *
+    npc.userData.speed;
+
+  npc.rotation.y =
+    npc.userData.direction;
+
+  if (Math.random() < 0.003) {
+
+    npc.userData.direction +=
+      (Math.random() - 0.5) * 1.5;
+
+  }
+
+}
 function animate() {
   requestAnimationFrame(animate);
   update();
