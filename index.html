@@ -8,8 +8,25 @@
 </head>
 <body>
   <div id="hud">
-    <div>HARLEM EMPIRE ONLINE</div>
-    <div class="small">WASD / ARROWS MOVE • SHIFT SPRINT</div>
+    <div id="mission">
+      <b>MISSION OBJECTIVE</b><br />
+      ◇ Go to Uncle Calvin's
+    </div>
+
+    <div id="stats">
+      <div class="money">$25,000</div>
+      <div class="stars">★☆☆☆☆</div>
+      <div>14:30</div>
+    </div>
+
+    <canvas id="miniMap" width="150" height="150"></canvas>
+  </div>
+
+  <div id="controlsText">
+    W A S D &nbsp; Move<br />
+    Shift &nbsp; Sprint<br />
+    Space &nbsp; Jump<br />
+    E &nbsp; Interact
   </div>
 
   <div id="mobileControls">
@@ -22,7 +39,6 @@
   </div>
 
   <canvas id="game"></canvas>
-
   <script type="module" src="./script.js"></script>
 </body>
-</html> 
+</html>
