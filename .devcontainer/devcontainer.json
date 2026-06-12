@@ -1,0 +1,16 @@
+{
+  "name": "Harlem Empire Dev",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": { "label": "Game Preview", "onAutoForward": "openPreview" }
+  },
+  "postCreateCommand": "npm install",
+  "customizations": { "vscode": { "extensions": ["esbenp.prettier-vscode"] } }
+}
+{
+  "name": "harlem-empire",
+  "version": "1.0.0",
+  "scripts": { "dev": "serve . -l 3000", "start": "serve . -l 3000" },
+  "devDependencies": { "serve": "^14.2.4" }
+}
