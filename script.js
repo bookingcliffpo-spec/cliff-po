@@ -1,330 +1,663 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js";
 
-const canvas=document.getElementById("game");
-const mini=document.getElementById("mini");
-const mctx=mini.getContext("2d");
+const canvas = document.getElementById("game");
+const mini = document.getElementById("mini");
+const mctx = mini ? mini.getContext("2d") : null;
 
-const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x8fd3ff);
-scene.fog=new THREE.Fog(0x8fd3ff,120,420);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x8fd3ff);
+scene.fog = new THREE.Fog(0x8fd3ff, 90, 260);
 
-const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,1000);
-const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
-renderer.setSize(innerWidth,innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-renderer.shadowMap.enabled=true;
-renderer.outputColorSpace=THREE.SRGBColorSpace;
-renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=1.2;
+const camera = new THREE.PerspectiveCamera(
+  65,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
 
-scene.add(new THREE.HemisphereLight(0xcceeff,0x3b2a1a,1.2));
-const sun=new THREE.DirectionalLight(0xfff0c8,3.6);
-sun.position.set(-70,100,60);
-sun.castShadow=true;
-sun.shadow.mapSize.set(2048,2048);
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: false,
+  powerPreference: "high-performance"
+});
+
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(1);
+renderer.shadowMap.enabled = false;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.25;
+
+const ambient = new THREE.AmbientLight(0xffffff, 2.1);
+scene.add(ambient);
+
+const sun = new THREE.DirectionalLight(0xfff1cf, 1.3);
+sun.position.set(40, 80, 30);
 scene.add(sun);
 
-const colliders=[], keys={}, touch={};
+const keys = {};
+const touchKeys = {};
+const colliders = [];
+const npcs = [];
 
-function material(color,rough=.7,metal=0){
-  return new THREE.MeshStandardMaterial({color,roughness:rough,metalness:metal});
+window.addEventListener("keydown", (e) => {
+  keys[e.key.toLowerCase()] = true;
+});
+
+window.addEventListener("keyup", (e) => {
+  keys[e.key.toLowerCase()] = false;
+});
+
+function makeMaterial(color, roughness = 0.7, metalness = 0) {
+  return new THREE.MeshStandardMaterial({
+    color,
+    roughness,
+    metalness
+  });
 }
 
-function box(w,h,d,color,x,y,z,rough=.7,metal=0){
-  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material(color,rough,metal));
-  m.position.set(x,y,z);
-  m.castShadow=true;
-  m.receiveShadow=true;
-  scene.add(m);
-  return m;
+function makeBox(width, height, depth, color, x, y, z, roughness = 0.7, metalness = 0) {
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(width, height, depth),
+    makeMaterial(color, roughness, metalness)
+  );
+
+  mesh.position.set(x, y, z);
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
+  scene.add(mesh);
+
+  return mesh;
 }
 
-function cyl(r,h,color,x,y,z){
-  const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,32),material(color));
-  m.position.set(x,y,z);
-  m.castShadow=true;
-  m.receiveShadow=true;
-  scene.add(m);
-  return m;
+function makeCylinder(radius, height, color, x, y, z) {
+  const mesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius, height, 18),
+    makeMaterial(color)
+  );
+
+  mesh.position.set(x, y, z);
+  scene.add(mesh);
+
+  return mesh;
 }
 
-function sign(text,w=512,h=180,size=44,bg="#2b160b",fg="#f5c76b"){
-  const c=document.createElement("canvas");
-  c.width=w;c.height=h;
-  const ctx=c.getContext("2d");
-  ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);
-  ctx.strokeStyle="#d9a441";ctx.lineWidth=10;ctx.strokeRect(8,8,w-16,h-16);
-  ctx.fillStyle=fg;ctx.font=`900 ${size}px Arial`;ctx.textAlign="center";ctx.textBaseline="middle";
-  const lines=text.split("\n");
-  lines.forEach((t,i)=>ctx.fillText(t,w/2,h/2+(i-(lines.length-1)/2)*size*1.1));
-  const tex=new THREE.CanvasTexture(c);
-  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tex}));
-  return s;
-}
+function makeCanvasTexture(type) {
+  const c = document.createElement("canvas");
+  c.width = 256;
+  c.height = 256;
 
-function brickTexture(){
-  const c=document.createElement("canvas");
-  c.width=512;c.height=512;
-  const ctx=c.getContext("2d");
-  ctx.fillStyle="#6b3e28";ctx.fillRect(0,0,512,512);
-  for(let y=0;y<512;y+=32){
-    for(let x=(y/32)%2? -40:0;x<512;x+=80){
-      ctx.fillStyle="rgba(0,0,0,.22)";
-      ctx.fillRect(x,y,76,3);
-      ctx.fillRect(x,y,3,30);
-      ctx.fillStyle="rgba(255,220,160,.05)";
-      ctx.fillRect(x+4,y+5,65,12);
+  const ctx = c.getContext("2d");
+
+  if (type === "asphalt") {
+    ctx.fillStyle = "#202020";
+    ctx.fillRect(0, 0, 256, 256);
+
+    for (let i = 0; i < 900; i++) {
+      const g = 35 + Math.random() * 70;
+      ctx.fillStyle = `rgba(${g},${g},${g},0.25)`;
+      ctx.fillRect(Math.random() * 256, Math.random() * 256, 1, 1);
     }
   }
-  return new THREE.CanvasTexture(c);
-}
 
-function asphaltTexture(){
-  const c=document.createElement("canvas");
-  c.width=512;c.height=512;
-  const ctx=c.getContext("2d");
-  ctx.fillStyle="#202020";ctx.fillRect(0,0,512,512);
-  for(let i=0;i<3000;i++){
-    const g=Math.floor(30+Math.random()*80);
-    ctx.fillStyle=`rgba(${g},${g},${g},${Math.random()*.2})`;
-    ctx.fillRect(Math.random()*512,Math.random()*512,1+Math.random()*3,1+Math.random()*3);
+  if (type === "brick") {
+    ctx.fillStyle = "#7a4a2a";
+    ctx.fillRect(0, 0, 256, 256);
+
+    for (let y = 0; y < 256; y += 24) {
+      for (let x = (y / 24) % 2 ? -32 : 0; x < 256; x += 64) {
+        ctx.fillStyle = "rgba(0,0,0,.28)";
+        ctx.fillRect(x, y, 62, 3);
+        ctx.fillRect(x, y, 3, 21);
+
+        ctx.fillStyle = "rgba(255,255,255,.05)";
+        ctx.fillRect(x + 4, y + 5, 48, 8);
+      }
+    }
   }
-  return new THREE.CanvasTexture(c);
+
+  if (type === "sidewalk") {
+    ctx.fillStyle = "#8a8a80";
+    ctx.fillRect(0, 0, 256, 256);
+
+    ctx.strokeStyle = "rgba(0,0,0,.22)";
+    ctx.lineWidth = 3;
+
+    for (let i = 0; i < 256; i += 64) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i, 256);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(0, i);
+      ctx.lineTo(256, i);
+      ctx.stroke();
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(c);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  return texture;
 }
 
-const asphalt=asphaltTexture();
-asphalt.wrapS=asphalt.wrapT=THREE.RepeatWrapping;
-asphalt.repeat.set(30,30);
+const asphaltTexture = makeCanvasTexture("asphalt");
+asphaltTexture.repeat.set(40, 40);
 
-const brick=brickTexture();
-brick.wrapS=brick.wrapT=THREE.RepeatWrapping;
-brick.repeat.set(2,6);
+const brickTexture = makeCanvasTexture("brick");
+brickTexture.repeat.set(2, 6);
 
-const ground=new THREE.Mesh(
-  new THREE.PlaneGeometry(420,420),
-  new THREE.MeshStandardMaterial({map:asphalt,roughness:.42,metalness:.05})
+const sidewalkTexture = makeCanvasTexture("sidewalk");
+sidewalkTexture.repeat.set(20, 20);
+
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(260, 260),
+  new THREE.MeshStandardMaterial({
+    map: asphaltTexture,
+    roughness: 0.45,
+    metalness: 0.05
+  })
 );
-ground.rotation.x=-Math.PI/2;
-ground.receiveShadow=true;
+
+ground.rotation.x = -Math.PI / 2;
 scene.add(ground);
 
-function road(x,z,w,d){
-  box(w,.04,d,0x111111,x,.04,z,.35,.05);
-}
+function makeSignText(text, width = 512, height = 160, fontSize = 44, bg = "#243c2c", fg = "#ffffff") {
+  const c = document.createElement("canvas");
+  c.width = width;
+  c.height = height;
 
-function createRoads(){
-  for(let i=-6;i<=6;i++){
-    road(0,i*32,420,14);
-    road(i*32,0,14,420);
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, width, height);
 
-    box(420,.08,4,0x777777,0,.08,i*32+9);
-    box(420,.08,4,0x777777,0,.08,i*32-9);
-    box(4,.08,420,0x777777,i*32+9,.08,0);
-    box(4,.08,420,0x777777,i*32-9,.08,0);
-  }
-  for(let i=-200;i<=200;i+=16){
-    box(.35,.09,5,0xe3c34d,0,.13,i,.3);
-    box(5,.09,.35,0xe3c34d,i,.13,0,.3);
-  }
-}
+  ctx.strokeStyle = "#d8c891";
+  ctx.lineWidth = 8;
+  ctx.strokeRect(8, 8, width - 16, height - 16);
 
-function building(x,z,w,d,h,type="brownstone"){
-  const matB=new THREE.MeshStandardMaterial({
-    map:brick,
-    color:type==="store"?0xffffff:0xb48a61,
-    roughness:.85
+  ctx.fillStyle = fg;
+  ctx.font = `900 ${fontSize}px Arial`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  const lines = text.split("\n");
+
+  lines.forEach((line, index) => {
+    ctx.fillText(
+      line,
+      width / 2,
+      height / 2 + (index - (lines.length - 1) / 2) * fontSize * 1.2
+    );
   });
-  const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),matB);
-  b.position.set(x,h/2,z);
-  b.castShadow=true;b.receiveShadow=true;
-  scene.add(b);
-  colliders.push({x,z,w,d});
 
-  const front=z-d/2-.05;
-  for(let y=3;y<h-1;y+=3){
-    for(let xx=-w/2+2;xx<w/2-1;xx+=3.2){
-      const win=box(1.25,1.3,.08,0xffc96b,x+xx,y,front,.25,.15);
-      win.material.emissive=new THREE.Color(0x2a1800);
-      win.material.emissiveIntensity=.45;
+  const texture = new THREE.CanvasTexture(c);
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: texture
+    })
+  );
+
+  return sprite;
+}
+
+function createRoads() {
+  for (let i = -3; i <= 3; i++) {
+    makeBox(260, 0.04, 12, 0x101010, 0, 0.03, i * 34, 0.35, 0.02);
+    makeBox(12, 0.04, 260, 0x101010, i * 34, 0.04, 0, 0.35, 0.02);
+
+    const side1 = new THREE.Mesh(
+      new THREE.BoxGeometry(260, 0.08, 4),
+      new THREE.MeshStandardMaterial({ map: sidewalkTexture })
+    );
+
+    side1.position.set(0, 0.08, i * 34 + 9);
+    scene.add(side1);
+
+    const side2 = side1.clone();
+    side2.position.set(0, 0.08, i * 34 - 9);
+    scene.add(side2);
+
+    const side3 = new THREE.Mesh(
+      new THREE.BoxGeometry(4, 0.08, 260),
+      new THREE.MeshStandardMaterial({ map: sidewalkTexture })
+    );
+
+    side3.position.set(i * 34 + 9, 0.09, 0);
+    scene.add(side3);
+
+    const side4 = side3.clone();
+    side4.position.set(i * 34 - 9, 0.09, 0);
+    scene.add(side4);
+  }
+
+  for (let i = -120; i <= 120; i += 18) {
+    makeBox(0.35, 0.07, 5, 0xe8c64a, 0, 0.13, i);
+    makeBox(5, 0.07, 0.35, 0xe8c64a, i, 0.13, 0);
+  }
+}
+
+function createBuilding(x, z, w, d, h, type = "brownstone") {
+  const material = new THREE.MeshStandardMaterial({
+    map: brickTexture,
+    color: type === "store" ? 0xffffff : 0xb77a4a,
+    roughness: 0.9
+  });
+
+  const b = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    material
+  );
+
+  b.position.set(x, h / 2, z);
+  scene.add(b);
+
+  colliders.push({ x, z, w, d });
+
+  const frontZ = z - d / 2 - 0.04;
+
+  for (let y = 3; y < h - 1; y += 3.2) {
+    for (let wx = -w / 2 + 2; wx < w / 2 - 1; wx += 3) {
+      const win = makeBox(1.15, 1.1, 0.08, 0xffcc77, x + wx, y, frontZ, 0.25, 0.15);
+      win.material.emissive = new THREE.Color(0x2a1800);
+      win.material.emissiveIntensity = 0.35;
     }
   }
 
-  box(w*.45,2,.18,0x111111,x,1.15,front-.1);
-  box(w*.7,.35,.35,0xd6aa58,x,2.45,front-.15);
+  makeBox(w * 0.45, 2, 0.15, 0x111111, x, 1.1, frontZ - 0.08);
+  makeBox(w * 0.8, 0.35, 0.3, 0xc99c52, x, 2.45, frontZ - 0.12);
 
-  if(type==="store"){
-    const names=["SOUL FOOD","BILL'S RECORDS","BARBER SHOP","LENNOX LOUNGE","BODEGA","CHICKEN & FISH"];
-    const s=sign(names[Math.floor(Math.random()*names.length)],512,150,42);
-    s.position.set(x,4.2,front-.35);
-    s.scale.set(10,3,1);
-    scene.add(s);
+  if (type === "store") {
+    const names = [
+      "SOUL FOOD",
+      "BILL'S RECORDS",
+      "BARBER SHOP",
+      "LENNOX LOUNGE",
+      "BODEGA",
+      "CHICKEN & FISH"
+    ];
+
+    const sign = makeSignText(
+      names[Math.floor(Math.random() * names.length)],
+      512,
+      140,
+      42,
+      "#2b160b",
+      "#f4c76b"
+    );
+
+    sign.position.set(x, 4.1, frontZ - 0.35);
+    sign.scale.set(9, 2.7, 1);
+    scene.add(sign);
   }
 
-  for(let y=5;y<h-2;y+=5){
-    box(.25,3,.25,0x111111,x-w/2-.35,y,z);
-    box(2.2,.18,.25,0x111111,x-w/2-.35,y-1.5,z);
+  for (let y = 5; y < h - 2; y += 5) {
+    makeBox(0.22, 3, 0.22, 0x111111, x - w / 2 - 0.35, y, z);
+    makeBox(2, 0.16, 0.22, 0x111111, x - w / 2 - 0.35, y - 1.5, z);
   }
 }
 
-function makeCar(x,z,color=0x050505){
-  const car=new THREE.Group();
-  const body=new THREE.Mesh(new THREE.BoxGeometry(3.4,.75,6),material(color,.22,.45));
-  body.position.y=.7;body.castShadow=true;car.add(body);
-  const top=new THREE.Mesh(new THREE.BoxGeometry(2.2,.8,2.4),material(0x111111,.28,.35));
-  top.position.set(0,1.25,-.3);top.castShadow=true;car.add(top);
-  const glass=new THREE.Mesh(new THREE.BoxGeometry(2,.45,1.7),material(0x4eb5ff,.08,.1));
-  glass.position.set(0,1.45,-.65);car.add(glass);
-  for(const sx of[-1.25,1.25])for(const sz of[-2,2]){
-    const w=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,.3,24),material(0x050505));
-    w.rotation.z=Math.PI/2;w.position.set(sx,.35,sz);car.add(w);
+function createCar(x, z, color = 0x050505) {
+  const car = new THREE.Group();
+
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(3.3, 0.75, 5.8),
+    makeMaterial(color, 0.25, 0.45)
+  );
+
+  body.position.y = 0.7;
+  car.add(body);
+
+  const roof = new THREE.Mesh(
+    new THREE.BoxGeometry(2.2, 0.75, 2.4),
+    makeMaterial(0x111111, 0.3, 0.35)
+  );
+
+  roof.position.set(0, 1.25, -0.3);
+  car.add(roof);
+
+  const glass = new THREE.Mesh(
+    new THREE.BoxGeometry(2, 0.42, 1.6),
+    makeMaterial(0x4eb5ff, 0.12, 0.1)
+  );
+
+  glass.position.set(0, 1.45, -0.65);
+  car.add(glass);
+
+  for (const sx of [-1.25, 1.25]) {
+    for (const sz of [-2, 2]) {
+      const wheel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.42, 0.42, 0.28, 18),
+        makeMaterial(0x050505)
+      );
+
+      wheel.rotation.z = Math.PI / 2;
+      wheel.position.set(sx, 0.35, sz);
+      car.add(wheel);
+    }
   }
-  car.position.set(x,0,z);
-  car.rotation.y=Math.random()*Math.PI;
+
+  car.position.set(x, 0, z);
+  car.rotation.y = Math.random() * Math.PI;
   scene.add(car);
 }
 
-function makeNPC(x,z){
-  const npc=new THREE.Group();
-  const skin=[0x5b351f,0x7a4a2a,0x3b2316][Math.floor(Math.random()*3)];
-  const shirt=[0x111111,0x1d3557,0x5a189a,0x7f5539][Math.floor(Math.random()*4)];
-  const body=new THREE.Mesh(new THREE.BoxGeometry(.55,1,.32),material(shirt));
-  body.position.y=1;body.castShadow=true;npc.add(body);
-  const head=new THREE.Mesh(new THREE.SphereGeometry(.24,18,18),material(skin));
-  head.position.y=1.65;head.castShadow=true;npc.add(head);
-  npc.position.set(x,0,z);
+function createNPC(x, z) {
+  const npc = new THREE.Group();
+
+  const skinColors = [0x5b351f, 0x7a4a2a, 0x3b2316];
+  const shirtColors = [0x111111, 0x1d3557, 0x5a189a, 0x7f5539];
+
+  const skin = skinColors[Math.floor(Math.random() * skinColors.length)];
+  const shirt = shirtColors[Math.floor(Math.random() * shirtColors.length)];
+
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.55, 1, 0.32),
+    makeMaterial(shirt)
+  );
+
+  body.position.y = 1;
+  npc.add(body);
+
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.24, 18, 18),
+    makeMaterial(skin)
+  );
+
+  head.position.y = 1.65;
+  npc.add(head);
+
+  npc.position.set(x, 0, z);
   scene.add(npc);
+
+  npcs.push({
+    mesh: npc,
+    angle: Math.random() * Math.PI * 2,
+    speed: 0.008 + Math.random() * 0.01
+  });
 }
 
-function streetProps(){
-  for(let i=0;i<80;i++){
-    const x=(Math.random()-.5)*380,z=(Math.random()-.5)*380;
-    cyl(.1,4,0x222222,x,2,z);
-    const l=new THREE.PointLight(0xffcc77,.45,18);
-    l.position.set(x,4.4,z);scene.add(l);
+function streetProps() {
+  for (let i = 0; i < 15; i++) {
+    const x = (Math.random() - 0.5) * 230;
+    const z = (Math.random() - 0.5) * 230;
+
+    makeCylinder(0.1, 4, 0x222222, x, 2, z);
   }
-  for(let i=0;i<45;i++){
-    const x=(Math.random()-.5)*360,z=(Math.random()-.5)*360;
-    cyl(.28,.7,0xaa2222,x,.35,z);
+
+  for (let i = 0; i < 18; i++) {
+    const x = (Math.random() - 0.5) * 230;
+    const z = (Math.random() - 0.5) * 230;
+
+    makeCylinder(0.28, 0.7, 0xaa2222, x, 0.35, z);
   }
-  for(let i=0;i<22;i++){
-    const s=sign(["W 125 ST","ONE WAY","LENOX AVE","PARKING","APOLLO"][Math.floor(Math.random()*5)],420,120,45,"#16492d","#ffffff");
-    s.position.set((Math.random()-.5)*320,5,(Math.random()-.5)*320);
-    s.scale.set(5,1.5,1);
-    scene.add(s);
-  }
+
+  const street = makeSignText("LENOX AVE", 420, 120, 46, "#3b725c", "#ffffff");
+  street.position.set(-24, 4.5, -20);
+  street.scale.set(5, 1.4, 1);
+  scene.add(street);
+
+  const mural = makeSignText("WELCOME TO\nHARLEM", 600, 260, 64, "#4a1e16", "#f4c66b");
+  mural.position.set(-18, 8, -44);
+  mural.scale.set(14, 6, 1);
+  scene.add(mural);
+
+  const apollo = makeSignText("APOLLO", 320, 600, 76, "#2b160b", "#ff9b2f");
+  apollo.position.set(-52, 14, -28);
+  apollo.scale.set(4.5, 12, 1);
+  scene.add(apollo);
 }
 
-function createCity(){
+function createCity() {
   createRoads();
 
-  for(let x=-176;x<=176;x+=32){
-    for(let z=-176;z<=176;z+=32){
-      if(Math.abs(x)<32&&Math.abs(z)<32)continue;
-      const h=12+Math.random()*30;
-      building(x+12,z+12,16,16,h,Math.random()>.6?"store":"brownstone");
+  for (let x = -84; x <= 84; x += 28) {
+    for (let z = -84; z <= 84; z += 28) {
+      if (Math.abs(x) < 28 && Math.abs(z) < 28) continue;
+
+      const h = 10 + Math.random() * 22;
+      const type = Math.random() > 0.6 ? "store" : "brownstone";
+
+      createBuilding(x + 12, z + 12, 14, 14, h, type);
     }
   }
 
-  const apollo=sign("APOLLO",320,600,78,"#2b160b","#ff9b2f");
-  apollo.position.set(-52,15,-28);
-  apollo.scale.set(5,14,1);
-  scene.add(apollo);
+  for (let i = 0; i < 8; i++) {
+    createCar(
+      (Math.random() - 0.5) * 170,
+      (Math.random() - 0.5) * 170,
+      [0x050505, 0x7a0000, 0x15315b, 0xb8b8b8][Math.floor(Math.random() * 4)]
+    );
+  }
 
-  const mural=sign("WELCOME TO\nHARLEM",600,260,68,"#4a1e16","#f4c66b");
-  mural.position.set(-18,8,-44);
-  mural.scale.set(16,7,1);
-  scene.add(mural);
+  for (let i = 0; i < 10; i++) {
+    createNPC(
+      (Math.random() - 0.5) * 170,
+      (Math.random() - 0.5) * 170
+    );
+  }
 
-  for(let i=0;i<35;i++)makeCar((Math.random()-.5)*330,(Math.random()-.5)*330,[0x050505,0x7a0000,0x15315b,0xb8b8b8][Math.floor(Math.random()*4)]);
-  for(let i=0;i<45;i++)makeNPC((Math.random()-.5)*330,(Math.random()-.5)*330);
   streetProps();
 }
 
-const player=new THREE.Group();
-player.position.set(0,0,0);
+const player = new THREE.Group();
+player.position.set(0, 0, 0);
 scene.add(player);
 
-function createPlayer(){
-  const skin=0x6b3f22;
-  const pants=0x1b355d;
-  const jacket=0x080a12;
+function createPlayer() {
+  const skin = 0x6b3f22;
+  const pants = 0x1b355d;
+  const jacket = 0x080a12;
 
-  const leg1=box(.28,1,.28,pants,-.2,.5,0);
-  const leg2=box(.28,1,.28,pants,.2,.5,0);
-  const body=box(.75,1.05,.38,jacket,0,1.35,0);
-  const head=new THREE.Mesh(new THREE.SphereGeometry(.32,32,32),material(skin,.42));
-  head.position.y=2.1;head.castShadow=true;player.add(head);
-  const cap=new THREE.Mesh(new THREE.CylinderGeometry(.36,.36,.16,32),material(0x050505));
-  cap.position.y=2.42;cap.castShadow=true;player.add(cap);
-  const brim=box(.45,.05,.25,0x050505,0,2.38,-.28);
-  const chain=new THREE.Mesh(new THREE.TorusGeometry(.28,.025,8,32),material(0xffd700,.2,.9));
-  chain.rotation.x=Math.PI/2;chain.position.set(0,1.6,-.23);player.add(chain);
-  player.add(leg1,leg2,body,brim);
+  const leg1 = new THREE.Mesh(
+    new THREE.BoxGeometry(0.28, 1, 0.28),
+    makeMaterial(pants)
+  );
+
+  leg1.position.set(-0.2, 0.5, 0);
+  player.add(leg1);
+
+  const leg2 = leg1.clone();
+  leg2.position.set(0.2, 0.5, 0);
+  player.add(leg2);
+
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.75, 1.05, 0.38),
+    makeMaterial(jacket)
+  );
+
+  body.position.y = 1.35;
+  player.add(body);
+
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.32, 24, 24),
+    makeMaterial(skin, 0.42)
+  );
+
+  head.position.y = 2.1;
+  player.add(head);
+
+  const cap = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.36, 0.36, 0.16, 24),
+    makeMaterial(0x050505)
+  );
+
+  cap.position.y = 2.42;
+  player.add(cap);
+
+  const brim = new THREE.Mesh(
+    new THREE.BoxGeometry(0.45, 0.05, 0.25),
+    makeMaterial(0x050505)
+  );
+
+  brim.position.set(0, 2.38, -0.28);
+  player.add(brim);
+
+  const chain = new THREE.Mesh(
+    new THREE.TorusGeometry(0.28, 0.025, 8, 24),
+    makeMaterial(0xffd700, 0.2, 0.9)
+  );
+
+  chain.rotation.x = Math.PI / 2;
+  chain.position.set(0, 1.62, -0.23);
+  player.add(chain);
 }
+
 createPlayer();
 createCity();
 
-function bind(id,key){
-  const b=document.getElementById(id);
-  b.addEventListener("touchstart",e=>{e.preventDefault();touch[key]=true});
-  b.addEventListener("touchend",e=>{e.preventDefault();touch[key]=false});
+function bindButton(id, key) {
+  const btn = document.getElementById(id);
+
+  if (!btn) return;
+
+  btn.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    touchKeys[key] = true;
+  });
+
+  btn.addEventListener("touchend", (e) => {
+    e.preventDefault();
+    touchKeys[key] = false;
+  });
+
+  btn.addEventListener("mousedown", () => {
+    touchKeys[key] = true;
+  });
+
+  btn.addEventListener("mouseup", () => {
+    touchKeys[key] = false;
+  });
 }
-["up","down","left","right"].forEach(id=>bind(id,id));
 
-addEventListener("keydown",e=>keys[e.key.toLowerCase()]=true);
-addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
+bindButton("up", "up");
+bindButton("down", "down");
+bindButton("left", "left");
+bindButton("right", "right");
 
-function pressed(k){return keys[k]||touch[k]}
+function pressed(key) {
+  return keys[key] || touchKeys[key];
+}
 
-function blocked(x,z){
-  for(const c of colliders){
-    if(Math.abs(x-c.x)<c.w/2+1&&Math.abs(z-c.z)<c.d/2+1)return true;
+function blocked(x, z) {
+  for (const c of colliders) {
+    if (
+      Math.abs(x - c.x) < c.w / 2 + 1 &&
+      Math.abs(z - c.z) < c.d / 2 + 1
+    ) {
+      return true;
+    }
   }
+
   return false;
 }
 
-function updatePlayer(){
-  let speed=pressed("shift")?.34:.2;
-  let mx=0,mz=0;
-  if(pressed("w")||keys.arrowup||pressed("up"))mz-=speed;
-  if(pressed("s")||keys.arrowdown||pressed("down"))mz+=speed;
-  if(pressed("a")||keys.arrowleft||pressed("left"))mx-=speed;
-  if(pressed("d")||keys.arrowright||pressed("right"))mx+=speed;
+function updatePlayer() {
+  const speed = pressed("shift") ? 0.55 : 0.3;
 
-  const nx=player.position.x+mx,nz=player.position.z+mz;
-  if(!blocked(nx,player.position.z))player.position.x=nx;
-  if(!blocked(player.position.x,nz))player.position.z=nz;
-  if(mx||mz)player.rotation.y=Math.atan2(mx,mz);
+  let mx = 0;
+  let mz = 0;
 
-  const target=player.position.clone().add(new THREE.Vector3(0,4.7,8.8));
-  camera.position.lerp(target,.1);
-  camera.lookAt(player.position.x,1.45,player.position.z);
-}
+  if (pressed("w") || keys["arrowup"] || pressed("up")) mz -= speed;
+  if (pressed("s") || keys["arrowdown"] || pressed("down")) mz += speed;
+  if (pressed("a") || keys["arrowleft"] || pressed("left")) mx -= speed;
+  if (pressed("d") || keys["arrowright"] || pressed("right")) mx += speed;
 
-function drawMini(){
-  mini.width=150;mini.height=150;
-  mctx.fillStyle="#222";mctx.fillRect(0,0,150,150);
-  mctx.strokeStyle="#777";
-  for(let i=0;i<150;i+=20){
-    mctx.beginPath();mctx.moveTo(i,0);mctx.lineTo(i,150);mctx.stroke();
-    mctx.beginPath();mctx.moveTo(0,i);mctx.lineTo(150,i);mctx.stroke();
+  const nx = player.position.x + mx;
+  const nz = player.position.z + mz;
+
+  if (!blocked(nx, player.position.z)) player.position.x = nx;
+  if (!blocked(player.position.x, nz)) player.position.z = nz;
+
+  if (mx !== 0 || mz !== 0) {
+    player.rotation.y = Math.atan2(mx, mz);
   }
-  mctx.fillStyle="#ffcc33";
-  mctx.beginPath();mctx.arc(75,75,6,0,Math.PI*2);mctx.fill();
+
+  const cameraTarget = player.position.clone().add(
+    new THREE.Vector3(0, 4.6, 8.7)
+  );
+
+  camera.position.lerp(cameraTarget, 0.25);
+  camera.lookAt(
+    player.position.x,
+    player.position.y + 1.45,
+    player.position.z
+  );
 }
 
-function animate(){
+function updateNPCs() {
+  for (const npc of npcs) {
+    npc.mesh.position.x += Math.sin(npc.angle) * npc.speed;
+    npc.mesh.position.z += Math.cos(npc.angle) * npc.speed;
+
+    if (Math.random() < 0.01) {
+      npc.angle += (Math.random() - 0.5) * 1.4;
+    }
+  }
+}
+
+let lastMiniDraw = 0;
+
+function drawMiniMap(time) {
+  if (!mctx) return;
+  if (time - lastMiniDraw < 300) return;
+
+  lastMiniDraw = time;
+
+  mini.width = 150;
+  mini.height = 150;
+
+  mctx.fillStyle = "#222";
+  mctx.fillRect(0, 0, 150, 150);
+
+  mctx.strokeStyle = "#777";
+  mctx.lineWidth = 1;
+
+  for (let i = 0; i < 150; i += 20) {
+    mctx.beginPath();
+    mctx.moveTo(i, 0);
+    mctx.lineTo(i, 150);
+    mctx.stroke();
+
+    mctx.beginPath();
+    mctx.moveTo(0, i);
+    mctx.lineTo(150, i);
+    mctx.stroke();
+  }
+
+  mctx.fillStyle = "#ffcc33";
+  mctx.beginPath();
+  mctx.arc(75, 75, 6, 0, Math.PI * 2);
+  mctx.fill();
+}
+
+let lastFrame = 0;
+
+function animate(time) {
   requestAnimationFrame(animate);
+
+  if (time - lastFrame < 16) return;
+
+  lastFrame = time;
+
   updatePlayer();
-  drawMini();
-  renderer.render(scene,camera);
+  updateNPCs();
+  drawMiniMap(time);
+
+  renderer.render(scene, camera);
 }
 
-camera.position.set(0,5,9);
+camera.position.set(0, 5, 9);
+camera.lookAt(player.position);
+
 animate();
 
-addEventListener("resize",()=>{
-  camera.aspect=innerWidth/innerHeight;
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth,innerHeight);
+  renderer.setSize(window.innerWidth, window.innerHeight);
 });
