@@ -1,3 +1,5 @@
+console.log("SCRIPT STARTED");
+alert("SCRIPT STARTED");
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.164/build/three.module.js';
 
 const scene = new THREE.Scene();
