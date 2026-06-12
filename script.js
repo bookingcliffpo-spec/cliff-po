@@ -8,12 +8,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x8fd3ff);
 scene.fog = new THREE.Fog(0x8fd3ff, 90, 260);
 
-const camera = new THREE.PerspectiveCamera(
-  65,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  1000
-);
+const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 1000);
 
 const renderer = new THREE.WebGLRenderer({
   canvas,
@@ -21,15 +16,14 @@ const renderer = new THREE.WebGLRenderer({
   powerPreference: "high-performance"
 });
 
-renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(1);
 renderer.shadowMap.enabled = false;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.25;
 
-const ambient = new THREE.AmbientLight(0xffffff, 2.1);
-scene.add(ambient);
+scene.add(new THREE.AmbientLight(0xffffff, 2.1));
 
 const sun = new THREE.DirectionalLight(0xfff1cf, 1.3);
 sun.position.set(40, 80, 30);
@@ -40,45 +34,37 @@ const touchKeys = {};
 const colliders = [];
 const npcs = [];
 
-window.addEventListener("keydown", (e) => {
+window.addEventListener("keydown", e => {
   keys[e.key.toLowerCase()] = true;
 });
 
-window.addEventListener("keyup", (e) => {
+window.addEventListener("keyup", e => {
   keys[e.key.toLowerCase()] = false;
 });
 
 function makeMaterial(color, roughness = 0.7, metalness = 0) {
-  return new THREE.MeshStandardMaterial({
-    color,
-    roughness,
-    metalness
-  });
+  return new THREE.MeshStandardMaterial({ color, roughness, metalness });
 }
 
-function makeBox(width, height, depth, color, x, y, z, roughness = 0.7, metalness = 0) {
+function makeBox(w, h, d, color, x, y, z, rough = 0.7, metal = 0) {
   const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(width, height, depth),
-    makeMaterial(color, roughness, metalness)
+    new THREE.BoxGeometry(w, h, d),
+    makeMaterial(color, rough, metal)
   );
 
   mesh.position.set(x, y, z);
-  mesh.castShadow = false;
-  mesh.receiveShadow = false;
   scene.add(mesh);
-
   return mesh;
 }
 
-function makeCylinder(radius, height, color, x, y, z) {
+function makeCylinder(r, h, color, x, y, z) {
   const mesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(radius, radius, height, 18),
+    new THREE.CylinderGeometry(r, r, h, 18),
     makeMaterial(color)
   );
 
   mesh.position.set(x, y, z);
   scene.add(mesh);
-
   return mesh;
 }
 
@@ -86,14 +72,13 @@ function makeCanvasTexture(type) {
   const c = document.createElement("canvas");
   c.width = 256;
   c.height = 256;
-
   const ctx = c.getContext("2d");
 
   if (type === "asphalt") {
     ctx.fillStyle = "#202020";
     ctx.fillRect(0, 0, 256, 256);
 
-    for (let i = 0; i < 900; i++) {
+    for (let i = 0; i < 800; i++) {
       const g = 35 + Math.random() * 70;
       ctx.fillStyle = `rgba(${g},${g},${g},0.25)`;
       ctx.fillRect(Math.random() * 256, Math.random() * 256, 1, 1);
@@ -109,9 +94,6 @@ function makeCanvasTexture(type) {
         ctx.fillStyle = "rgba(0,0,0,.28)";
         ctx.fillRect(x, y, 62, 3);
         ctx.fillRect(x, y, 3, 21);
-
-        ctx.fillStyle = "rgba(255,255,255,.05)";
-        ctx.fillRect(x + 4, y + 5, 48, 8);
       }
     }
   }
@@ -136,12 +118,11 @@ function makeCanvasTexture(type) {
     }
   }
 
-  const texture = new THREE.CanvasTexture(c);
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.colorSpace = THREE.SRGBColorSpace;
-
-  return texture;
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
 }
 
 const asphaltTexture = makeCanvasTexture("asphalt");
@@ -196,25 +177,18 @@ function makeSignText(text, width = 512, height = 160, fontSize = 44, bg = "#243
   const texture = new THREE.CanvasTexture(c);
   texture.colorSpace = THREE.SRGBColorSpace;
 
-  const sprite = new THREE.Sprite(
-    new THREE.SpriteMaterial({
-      map: texture
-    })
-  );
-
-  return sprite;
+  return new THREE.Sprite(new THREE.SpriteMaterial({ map: texture }));
 }
 
 function createRoads() {
   for (let i = -3; i <= 3; i++) {
-    makeBox(260, 0.04, 12, 0x101010, 0, 0.03, i * 34, 0.35, 0.02);
-    makeBox(12, 0.04, 260, 0x101010, i * 34, 0.04, 0, 0.35, 0.02);
+    makeBox(260, 0.04, 12, 0x101010, 0, 0.03, i * 34);
+    makeBox(12, 0.04, 260, 0x101010, i * 34, 0.04, 0);
 
     const side1 = new THREE.Mesh(
       new THREE.BoxGeometry(260, 0.08, 4),
       new THREE.MeshStandardMaterial({ map: sidewalkTexture })
     );
-
     side1.position.set(0, 0.08, i * 34 + 9);
     scene.add(side1);
 
@@ -226,7 +200,6 @@ function createRoads() {
       new THREE.BoxGeometry(4, 0.08, 260),
       new THREE.MeshStandardMaterial({ map: sidewalkTexture })
     );
-
     side3.position.set(i * 34 + 9, 0.09, 0);
     scene.add(side3);
 
@@ -242,15 +215,13 @@ function createRoads() {
 }
 
 function createBuilding(x, z, w, d, h, type = "brownstone") {
-  const material = new THREE.MeshStandardMaterial({
-    map: brickTexture,
-    color: type === "store" ? 0xffffff : 0xb77a4a,
-    roughness: 0.9
-  });
-
   const b = new THREE.Mesh(
     new THREE.BoxGeometry(w, h, d),
-    material
+    new THREE.MeshStandardMaterial({
+      map: brickTexture,
+      color: type === "store" ? 0xffffff : 0xb77a4a,
+      roughness: 0.9
+    })
   );
 
   b.position.set(x, h / 2, z);
@@ -272,32 +243,12 @@ function createBuilding(x, z, w, d, h, type = "brownstone") {
   makeBox(w * 0.8, 0.35, 0.3, 0xc99c52, x, 2.45, frontZ - 0.12);
 
   if (type === "store") {
-    const names = [
-      "SOUL FOOD",
-      "BILL'S RECORDS",
-      "BARBER SHOP",
-      "LENNOX LOUNGE",
-      "BODEGA",
-      "CHICKEN & FISH"
-    ];
-
-    const sign = makeSignText(
-      names[Math.floor(Math.random() * names.length)],
-      512,
-      140,
-      42,
-      "#2b160b",
-      "#f4c76b"
-    );
+    const names = ["SOUL FOOD", "BILL'S RECORDS", "BARBER SHOP", "LENNOX LOUNGE", "BODEGA"];
+    const sign = makeSignText(names[Math.floor(Math.random() * names.length)], 512, 140, 42, "#2b160b", "#f4c76b");
 
     sign.position.set(x, 4.1, frontZ - 0.35);
     sign.scale.set(9, 2.7, 1);
     scene.add(sign);
-  }
-
-  for (let y = 5; y < h - 2; y += 5) {
-    makeBox(0.22, 3, 0.22, 0x111111, x - w / 2 - 0.35, y, z);
-    makeBox(2, 0.16, 0.22, 0x111111, x - w / 2 - 0.35, y - 1.5, z);
   }
 }
 
@@ -308,7 +259,6 @@ function createCar(x, z, color = 0x050505) {
     new THREE.BoxGeometry(3.3, 0.75, 5.8),
     makeMaterial(color, 0.25, 0.45)
   );
-
   body.position.y = 0.7;
   car.add(body);
 
@@ -316,17 +266,8 @@ function createCar(x, z, color = 0x050505) {
     new THREE.BoxGeometry(2.2, 0.75, 2.4),
     makeMaterial(0x111111, 0.3, 0.35)
   );
-
   roof.position.set(0, 1.25, -0.3);
   car.add(roof);
-
-  const glass = new THREE.Mesh(
-    new THREE.BoxGeometry(2, 0.42, 1.6),
-    makeMaterial(0x4eb5ff, 0.12, 0.1)
-  );
-
-  glass.position.set(0, 1.45, -0.65);
-  car.add(glass);
 
   for (const sx of [-1.25, 1.25]) {
     for (const sz of [-2, 2]) {
@@ -349,25 +290,17 @@ function createCar(x, z, color = 0x050505) {
 function createNPC(x, z) {
   const npc = new THREE.Group();
 
-  const skinColors = [0x5b351f, 0x7a4a2a, 0x3b2316];
-  const shirtColors = [0x111111, 0x1d3557, 0x5a189a, 0x7f5539];
-
-  const skin = skinColors[Math.floor(Math.random() * skinColors.length)];
-  const shirt = shirtColors[Math.floor(Math.random() * shirtColors.length)];
-
   const body = new THREE.Mesh(
     new THREE.BoxGeometry(0.55, 1, 0.32),
-    makeMaterial(shirt)
+    makeMaterial(0x222244)
   );
-
   body.position.y = 1;
   npc.add(body);
 
   const head = new THREE.Mesh(
     new THREE.SphereGeometry(0.24, 18, 18),
-    makeMaterial(skin)
+    makeMaterial(0x6b3f22)
   );
-
   head.position.y = 1.65;
   npc.add(head);
 
@@ -379,37 +312,6 @@ function createNPC(x, z) {
     angle: Math.random() * Math.PI * 2,
     speed: 0.008 + Math.random() * 0.01
   });
-}
-
-function streetProps() {
-  for (let i = 0; i < 15; i++) {
-    const x = (Math.random() - 0.5) * 230;
-    const z = (Math.random() - 0.5) * 230;
-
-    makeCylinder(0.1, 4, 0x222222, x, 2, z);
-  }
-
-  for (let i = 0; i < 18; i++) {
-    const x = (Math.random() - 0.5) * 230;
-    const z = (Math.random() - 0.5) * 230;
-
-    makeCylinder(0.28, 0.7, 0xaa2222, x, 0.35, z);
-  }
-
-  const street = makeSignText("LENOX AVE", 420, 120, 46, "#3b725c", "#ffffff");
-  street.position.set(-24, 4.5, -20);
-  street.scale.set(5, 1.4, 1);
-  scene.add(street);
-
-  const mural = makeSignText("WELCOME TO\nHARLEM", 600, 260, 64, "#4a1e16", "#f4c66b");
-  mural.position.set(-18, 8, -44);
-  mural.scale.set(14, 6, 1);
-  scene.add(mural);
-
-  const apollo = makeSignText("APOLLO", 320, 600, 76, "#2b160b", "#ff9b2f");
-  apollo.position.set(-52, 14, -28);
-  apollo.scale.set(4.5, 12, 1);
-  scene.add(apollo);
 }
 
 function createCity() {
@@ -435,13 +337,13 @@ function createCity() {
   }
 
   for (let i = 0; i < 10; i++) {
-    createNPC(
-      (Math.random() - 0.5) * 170,
-      (Math.random() - 0.5) * 170
-    );
+    createNPC((Math.random() - 0.5) * 170, (Math.random() - 0.5) * 170);
   }
 
-  streetProps();
+  const street = makeSignText("LENOX AVE", 420, 120, 46, "#3b725c", "#ffffff");
+  street.position.set(-24, 4.5, -20);
+  street.scale.set(5, 1.4, 1);
+  scene.add(street);
 }
 
 const player = new THREE.Group();
@@ -450,34 +352,14 @@ scene.add(player);
 
 function createPlayer() {
   const skin = 0x6b3f22;
-  const pants = 0x1b355d;
-  const jacket = 0x080a12;
 
-  const leg1 = new THREE.Mesh(
-    new THREE.BoxGeometry(0.28, 1, 0.28),
-    makeMaterial(pants)
-  );
-
-  leg1.position.set(-0.2, 0.5, 0);
-  player.add(leg1);
-
-  const leg2 = leg1.clone();
-  leg2.position.set(0.2, 0.5, 0);
-  player.add(leg2);
-
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(0.75, 1.05, 0.38),
-    makeMaterial(jacket)
-  );
-
-  body.position.y = 1.35;
-  player.add(body);
+  const legs = makeBox(0.62, 1, 0.3, 0x1b355d, 0, 0.5, 0);
+  const body = makeBox(0.8, 1.05, 0.38, 0x080a12, 0, 1.35, 0);
 
   const head = new THREE.Mesh(
     new THREE.SphereGeometry(0.32, 24, 24),
-    makeMaterial(skin, 0.42)
+    makeMaterial(skin)
   );
-
   head.position.y = 2.1;
   player.add(head);
 
@@ -485,26 +367,18 @@ function createPlayer() {
     new THREE.CylinderGeometry(0.36, 0.36, 0.16, 24),
     makeMaterial(0x050505)
   );
-
   cap.position.y = 2.42;
   player.add(cap);
-
-  const brim = new THREE.Mesh(
-    new THREE.BoxGeometry(0.45, 0.05, 0.25),
-    makeMaterial(0x050505)
-  );
-
-  brim.position.set(0, 2.38, -0.28);
-  player.add(brim);
 
   const chain = new THREE.Mesh(
     new THREE.TorusGeometry(0.28, 0.025, 8, 24),
     makeMaterial(0xffd700, 0.2, 0.9)
   );
-
   chain.rotation.x = Math.PI / 2;
   chain.position.set(0, 1.62, -0.23);
   player.add(chain);
+
+  player.add(legs, body);
 }
 
 createPlayer();
@@ -512,26 +386,20 @@ createCity();
 
 function bindButton(id, key) {
   const btn = document.getElementById(id);
-
   if (!btn) return;
 
-  btn.addEventListener("touchstart", (e) => {
+  btn.addEventListener("touchstart", e => {
     e.preventDefault();
     touchKeys[key] = true;
   });
 
-  btn.addEventListener("touchend", (e) => {
+  btn.addEventListener("touchend", e => {
     e.preventDefault();
     touchKeys[key] = false;
   });
 
-  btn.addEventListener("mousedown", () => {
-    touchKeys[key] = true;
-  });
-
-  btn.addEventListener("mouseup", () => {
-    touchKeys[key] = false;
-  });
+  btn.addEventListener("mousedown", () => touchKeys[key] = true);
+  btn.addEventListener("mouseup", () => touchKeys[key] = false);
 }
 
 bindButton("up", "up");
@@ -545,14 +413,10 @@ function pressed(key) {
 
 function blocked(x, z) {
   for (const c of colliders) {
-    if (
-      Math.abs(x - c.x) < c.w / 2 + 1 &&
-      Math.abs(z - c.z) < c.d / 2 + 1
-    ) {
+    if (Math.abs(x - c.x) < c.w / 2 + 1 && Math.abs(z - c.z) < c.d / 2 + 1) {
       return true;
     }
   }
-
   return false;
 }
 
@@ -577,16 +441,9 @@ function updatePlayer() {
     player.rotation.y = Math.atan2(mx, mz);
   }
 
-  const cameraTarget = player.position.clone().add(
-    new THREE.Vector3(0, 4.6, 8.7)
-  );
-
+  const cameraTarget = player.position.clone().add(new THREE.Vector3(0, 4.6, 8.7));
   camera.position.lerp(cameraTarget, 0.25);
-  camera.lookAt(
-    player.position.x,
-    player.position.y + 1.45,
-    player.position.z
-  );
+  camera.lookAt(player.position.x, player.position.y + 1.45, player.position.z);
 }
 
 function updateNPCs() {
@@ -600,41 +457,6 @@ function updateNPCs() {
   }
 }
 
-let lastMiniDraw = 0;
-
-function drawMiniMap(time) {
-  if (!mctx) return;
-  if (time - lastMiniDraw < 300) return;
-
-  lastMiniDraw = time;
-
-  mini.width = 150;
-  mini.height = 150;
-
-  mctx.fillStyle = "#222";
-  mctx.fillRect(0, 0, 150, 150);
-
-  mctx.strokeStyle = "#777";
-  mctx.lineWidth = 1;
-
-  for (let i = 0; i < 150; i += 20) {
-    mctx.beginPath();
-    mctx.moveTo(i, 0);
-    mctx.lineTo(i, 150);
-    mctx.stroke();
-
-    mctx.beginPath();
-    mctx.moveTo(0, i);
-    mctx.lineTo(150, i);
-    mctx.stroke();
-  }
-
-  mctx.fillStyle = "#ffcc33";
-  mctx.beginPath();
-  mctx.arc(75, 75, 6, 0, Math.PI * 2);
-  mctx.fill();
-}
-
 let lastFrame = 0;
 
 function animate(time) {
@@ -646,7 +468,6 @@ function animate(time) {
 
   updatePlayer();
   updateNPCs();
-  drawMiniMap(time);
 
   renderer.render(scene, camera);
 }
@@ -657,7 +478,94 @@ camera.lookAt(player.position);
 animate();
 
 window.addEventListener("resize", () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* HIP HOP MUSIC BUTTON */
+const musicButton = document.createElement("button");
+musicButton.innerText = "♪ MUSIC";
+musicButton.style.position = "fixed";
+musicButton.style.top = "115px";
+musicButton.style.right = "25px";
+musicButton.style.zIndex = "999";
+musicButton.style.padding = "10px 14px";
+musicButton.style.borderRadius = "10px";
+musicButton.style.border = "none";
+musicButton.style.background = "rgba(0,0,0,.65)";
+musicButton.style.color = "white";
+musicButton.style.fontWeight = "900";
+document.body.appendChild(musicButton);
+
+let audioCtx;
+let musicOn = false;
+let beatTimer;
+
+function playBeat() {
+  if (!audioCtx) {
+    audioCtx = new AudioContext();
+  }
+
+  const now = audioCtx.currentTime;
+
+  function drum(freq, time, decay = 0.12) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.frequency.value = freq;
+    osc.type = "sine";
+
+    gain.gain.setValueAtTime(0.8, time);
+    gain.gain.exponentialRampToValueAtTime(0.01, time + decay);
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.start(time);
+    osc.stop(time + decay);
+  }
+
+  function hat(time) {
+    const bufferSize = audioCtx.sampleRate * 0.04;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+
+    const source = audioCtx.createBufferSource();
+    const gain = audioCtx.createGain();
+
+    gain.gain.setValueAtTime(0.12, time);
+    gain.gain.exponentialRampToValueAtTime(0.01, time + 0.04);
+
+    source.buffer = buffer;
+    source.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    source.start(time);
+    source.stop(time + 0.04);
+  }
+
+  drum(60, now, 0.18);
+  drum(160, now + 0.35, 0.08);
+
+  for (let i = 0; i < 8; i++) {
+    hat(now + i * 0.12);
+  }
+}
+
+musicButton.addEventListener("click", () => {
+  musicOn = !musicOn;
+
+  if (musicOn) {
+    musicButton.innerText = "♪ ON";
+    playBeat();
+    beatTimer = setInterval(playBeat, 960);
+  } else {
+    musicButton.innerText = "♪ MUSIC";
+    clearInterval(beatTimer);
+  }
 });
