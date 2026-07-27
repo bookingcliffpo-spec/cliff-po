@@ -1,30 +1,39 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Harlem Empire Online</title>
-  <link rel="stylesheet" href="style.css">
+  <title>Claude of Duty — Desolate New York City</title>
+  <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <div id="mission">MISSION OBJECTIVE<br><span>◇ Go to Uncle Calvin's</span></div>
-  <div id="stats">
-    <div class="money">$25,000</div>
-    <div class="stars">★☆☆☆☆</div>
-    <div>14:30</div>
-  </div>
-  <canvas id="mini"></canvas>
-  <div id="controls">WASD Move<br>Shift Sprint<br>E Interact</div>
+  <canvas id="game"></canvas>
 
-  <div id="mobile">
-    <button id="up">↑</button>
-    <div>
-      <button id="left">←</button>
-      <button id="down">↓</button>
-      <button id="right">→</button>
+  <div id="loader">
+    <div class="inner">
+      <div class="title">CLAUDE OF DUTY</div>
+      <div class="sub">DESOLATE NEW YORK CITY</div>
+      <div class="track"><div id="loadbar"></div></div>
+      <div id="loadlabel">Initialising</div>
     </div>
   </div>
 
-  <canvas id="game"></canvas>
-  <script type="module" src="script.js"></script>
+  <div id="start">
+    <div class="panel">
+      <h1>DESOLATE NEW YORK CITY</h1>
+      <p class="tag">Lower Meridian Avenue &middot; 17:40 &middot; overcast</p>
+      <div class="keys">
+        <div><b>WASD</b> move</div><div><b>Mouse</b> look</div>
+        <div><b>LMB</b> fire</div><div><b>RMB</b> aim</div>
+        <div><b>Shift</b> sprint</div><div><b>Ctrl / C</b> crouch</div>
+        <div><b>Space</b> jump &middot; mantle</div><div><b>R</b> reload</div>
+        <div><b>Q</b> lean</div><div><b>T</b> inspect weapon</div>
+        <div><b>Esc</b> release cursor</div><div><b>F1</b> toggle stats</div>
+      </div>
+      <div class="cta">CLICK TO DEPLOY</div>
+    </div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
 </body>
 </html>
