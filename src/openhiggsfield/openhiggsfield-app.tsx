@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { getStudioStatus, submitGeneration, type StudioStatus } from "@/generation/actions";
-import { MODELS, findModel, getModel, providerOf } from "@/generation/catalog";
+import { cancelGeneration, getStudioStatus, submitGeneration, type StudioStatus } from "@/generation/actions";
+import type { Direction } from "@/generation/cinema";
+import { useDirection } from "@/generation/stores/direction";
+import { MODELS, findModel, getModel, promptRequired, providerOf } from "@/generation/catalog";
 import type { ModelEntry } from "@/generation/catalog";
 import type { Surface } from "@/generation/catalog";
 import type { GenerationStatus } from "@/generation/higgsfield/types";
-import { assemblePlane } from "@/generation/plane";
-import { POLL_DEADLINE_MS, WatchError } from "@/generation/poll";
+import { activeDirection, assemblePlane } from "@/generation/plane";
+import { LOCAL_GPU_DEADLINE_MS, POLL_DEADLINE_MS, WatchError } from "@/generation/poll";
 import { studioPoller } from "@/generation/poller";
 import { callAction, type ActionFailure } from "@/generation/result";
 import { DEFAULT_MODEL, useActive } from "@/generation/stores/active";
@@ -57,6 +59,10 @@ export interface ActiveRun {
   modelLabel: string;
   ratio: string;
   startedAt: number;
+  /** Set once the provider accepted the run, which makes it cancelable. */
+  requestId?: string;
+  progress?: number;
+  phase?: string;
 }
 
 type RunDraft = {
@@ -68,8 +74,16 @@ type RunDraft = {
   meta: string;
   badge?: string;
   settings?: Record<string, unknown>;
+  direction?: Direction;
   createdAt: number;
 };
+
+function deadlineFor(draft: RunDraft): number {
+  const entry = findModel(draft.modelId);
+  const window =
+    entry && providerOf(entry) === "wangp" ? LOCAL_GPU_DEADLINE_MS : POLL_DEADLINE_MS[draft.surface];
+  return draft.createdAt + window;
+}
 
 function hueOf(seed: string): number {
   let h = 0;
@@ -91,6 +105,7 @@ function draftOf(record: RunRecord): RunDraft {
     meta: record.meta,
     badge: record.badge,
     settings: record.settings,
+    direction: record.direction,
     createdAt: record.createdAt,
   };
 }
@@ -114,6 +129,7 @@ function runningRows(requestId: string, count: number, draft: RunDraft): RunReco
       art: artFor(draft.surface, hueOf(id), id),
       createdAt: draft.createdAt,
       settings: draft.settings,
+      ...(draft.direction ? { direction: draft.direction } : {}),
     };
   });
 }
@@ -147,6 +163,7 @@ function terminalRows(requestId: string, draft: RunDraft, status: GenerationStat
       art: artFor(draft.surface, hueOf(id), id),
       createdAt: draft.createdAt,
       settings: draft.settings,
+      ...(draft.direction ? { direction: draft.direction } : {}),
     };
   });
 }
@@ -339,7 +356,19 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
       let status: GenerationStatus;
       try {
         status = await studioPoller.watch(requestId, {
-          deadline: draft.createdAt + POLL_DEADLINE_MS[draft.surface],
+          deadline: deadlineFor(draft),
+          /* Live progress onto the running rows; the provider's own stage
+             label rides along. */
+          onUpdate: (update) => {
+            if (!alive.current || (update.progress === undefined && !update.phase)) return;
+            setHistory((prev) =>
+              prev.map((row) =>
+                row.status === "running" && requestIdOf(row) === requestId
+                  ? { ...row, progress: update.progress ?? row.progress, phase: update.phase ?? row.phase }
+                  : row,
+              ),
+            );
+          },
         });
       } catch (caught) {
         if (!alive.current) return;
@@ -401,7 +430,7 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
       if (first) setModel(first.id);
       else if (next === "video") {
         setError(
-          "Video needs a provider key — there is no free video model. Add HF_API_KEY (or a key in the studio) to generate video.",
+          "Video needs a video backend: connect WanGP on your own GPU for free (WANGP_URL, see README), or add HF_API_KEY for the hosted models.",
         );
       }
     },
@@ -420,7 +449,8 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
       return;
     }
     const plane = assemblePlane();
-    if (!plane.prompt.text.trim()) return;
+    const pressedEntry = getModel(plane.model);
+    if (!plane.prompt.text.trim() && promptRequired(pressedEntry, plane.media, plane.settings)) return;
     const signature = planeSignature(plane);
     const now = Date.now();
     if (
@@ -460,11 +490,16 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
     const slots = native
       ? [{ skeletons: pending.map((slot) => slot.id) }]
       : pending.map((slot) => ({ skeletons: [slot.id] }));
+    const direction = activeDirection();
+    const rawText = (entry.surface === "image" ? useImagePrompt : useVideoPrompt).getState().text.trim();
     const draft: RunDraft = {
       surface: entry.surface,
       modelId: entry.id,
       modelLabel: entry.label,
-      prompt: plane.prompt.text.trim(),
+      /* History keeps the visitor's own words; the Director's notes travel
+         beside them, so reuse does not stack notes onto notes. */
+      prompt: rawText || plane.prompt.text.trim(),
+      ...(direction ? { direction } : {}),
       ratio,
       meta,
       badge,
@@ -523,11 +558,34 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
         if (record.settings) setSettings(record.modelId, record.settings);
       }
       (record.surface === "image" ? useImagePrompt : useVideoPrompt).getState().setText(record.prompt);
+      if (record.direction) useDirection.getState().replace(record.direction);
       setViewerId(null);
       setError(null);
       setFocusNonce((n) => n + 1);
     },
     [setModel, setSettings],
+  );
+
+  /* Cancel stops the provider first; only once it agreed (or the run is
+     keyless) does the tile turn into a canceled record. */
+  const cancelRun = useCallback(
+    async (requestId: string) => {
+      const rows = historyRef.current.filter(
+        (record) => record.status === "running" && requestIdOf(record) === requestId,
+      );
+      if (rows.length === 0) return;
+      const result = await callAction(() => cancelGeneration({ requestId }));
+      if (!alive.current) return;
+      if (!result.ok) {
+        setError(`Could not cancel — ${result.error}`);
+        return;
+      }
+      studioPoller.unwatch(requestId);
+      setHistory((prev) =>
+        replaceRequest(prev, requestId, failedRows(requestId, rows.length, draftOf(rows[0]!), "Canceled.")),
+      );
+    },
+    [],
   );
 
   const toggleFavorite = useCallback((record: RunRecord) => {
@@ -774,6 +832,7 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
             onReuse={retry}
             onFavorite={toggleFavorite}
             onDownload={downloadRun}
+            onCancel={cancelRun}
             onDelete={deleteRun}
             onStarter={applyStarter}
             galleryRef={galleryRef}

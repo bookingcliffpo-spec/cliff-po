@@ -3780,3 +3780,171 @@ html:has(.ohf dialog[open]) {
     height: 40px;
   }
 }
+
+/* ---------- run progress + cancel (fork) ---------- */
+
+.ohf-skeleton {
+  position: relative;
+}
+.ohf-skeleton-progress {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--accent);
+  transition: width 0.6s var(--ease);
+}
+.ohf-skeleton-cancel {
+  position: absolute;
+  /* Above the skeleton's shimmer overlay (::after, inset 0). */
+  z-index: 2;
+  top: 10px;
+  right: 10px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--tx2);
+  background: rgba(9, 13, 12, 0.72);
+  border: 1px solid var(--line-2);
+}
+.ohf-skeleton-cancel:hover:not(:disabled) {
+  color: var(--tx);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+.ohf-skeleton-cancel:disabled {
+  opacity: 0.6;
+}
+
+/* ---------- Director's Panel (fork) ---------- */
+
+.ohf-popover--director {
+  width: min(560px, 100%);
+  max-height: min(70vh, 620px);
+  overflow-y: auto;
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ohf-director-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ohf-director-title {
+  font-size: 14px;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+.ohf-director-sub,
+.ohf-director-hint {
+  font-size: 11.5px;
+  color: var(--tx3);
+}
+.ohf-director-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--tx2);
+  cursor: pointer;
+}
+.ohf-director-toggle input {
+  accent-color: var(--accent);
+}
+.ohf-director-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+.ohf-director-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.ohf-select {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: var(--s1);
+  border: 1px solid var(--line-2);
+  color: var(--tx);
+  font: inherit;
+  font-size: 12.5px;
+}
+.ohf-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.ohf-director-color {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+}
+.ohf-director-color input[type="color"] {
+  width: 40px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  background: none;
+}
+.ohf-director-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--s1);
+  border: 1px solid var(--line);
+}
+.ohf-director-preview p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--tx2);
+}
+.ohf-director-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.ohf-ctl-count {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+/* Reference tag chooser on an attached reference. */
+.ohf-strip-tagsel {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  height: 18px;
+  font-size: 9.5px;
+  padding: 0 2px;
+  border-radius: 5px;
+  background: rgba(9, 13, 12, 0.82);
+  color: var(--tx);
+  border: 1px solid var(--line-2);
+}
+@media (max-width: 560px) {
+  .ohf-director-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ohf-select {
+    font-size: 16px;
+    height: 38px;
+  }
+}

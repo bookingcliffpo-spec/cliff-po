@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
-import type { MediaItem, MediaRole, ModelEntry } from "@/generation/catalog";
+import { REFERENCE_TAGS } from "@/generation/catalog";
+import type { MediaItem, MediaRole, ModelEntry, ReferenceTag } from "@/generation/catalog";
 import { ROLE_KIND } from "@/generation/media-rules";
 import type { StorageDriver } from "@/generation/storage/config";
 import { useImageMedia, useVideoMedia } from "@/generation/stores/media";
@@ -202,7 +203,26 @@ export function MediaStrip({ model }: { model: ModelEntry }) {
                 }}
               />
             )}
-            <span className="ohf-strip-tag">{ROLE_TAGS[item.role]}</span>
+            {item.role === "reference" ? (
+              /* What the reference stands for; the model is told in the prompt. */
+              <select
+                className="ohf-strip-tagsel"
+                aria-label="Reference type"
+                value={item.tag ?? ""}
+                onChange={(event) =>
+                  media.update(item.id, { tag: (event.target.value || undefined) as ReferenceTag | undefined })
+                }
+              >
+                <option value="">Ref</option>
+                {REFERENCE_TAGS.map((tag) => (
+                  <option key={tag} value={tag}>
+                    {tag[0]!.toUpperCase() + tag.slice(1)}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="ohf-strip-tag">{ROLE_TAGS[item.role]}</span>
+            )}
           </span>
           <button
             type="button"

@@ -89,6 +89,14 @@ const SETTING_LABELS: Record<string, string> = {
   keepOriginalSound: "Keep original sound",
   characterOrientation: "Orientation",
   steps: "Steps",
+  region: "Edit region",
+  direction: "Extend",
+  motionMode: "Mode",
+  preset: "Preset",
+  preserveMotion: "Keep motion",
+  preserveCamera: "Keep camera",
+  preserveTiming: "Keep timing",
+  preserveBackground: "Keep background",
 };
 
 /* A pill carries one word; "Generate audio" is a panel label, not a control on
@@ -117,8 +125,30 @@ export function settingValueLabel(key: string, value: unknown): string {
   if (text === "auto") return "Auto";
   if (/^\d+k$/.test(text)) return text.toUpperCase();
   if (key === "outputFormat") return text.toUpperCase();
+  if (key === "preset" || key === "region" || key === "direction" || key === "motionMode") {
+    const named = VALUE_LABELS[text];
+    if (named) return named;
+    return text
+      .replace(/^(swap|style|env)-/, (_, kind: string) => (kind === "swap" ? "Swap " : kind === "style" ? "Style: " : "Scene: "))
+      .replace(/-/g, " ")
+      .replace(/^./, (c) => c.toUpperCase());
+  }
   return text;
 }
+
+const VALUE_LABELS: Record<string, string> = {
+  custom: "Custom instruction",
+  whole: "Whole video",
+  object: "An object",
+  face: "A face",
+  label: "Label / text",
+  wardrobe: "Wardrobe",
+  background: "Background",
+  forward: "Forward",
+  backward: "Backward",
+  animate: "Animate my character",
+  replace: "Replace the person",
+};
 
 export const ROLE_LABELS: Record<MediaRole, string> = {
   start: "Start frame",
@@ -247,6 +277,7 @@ const FREE_NOTES: Record<string, string | undefined> = {
   pollinations: "free, no API key (Pollinations, rate-limited)",
   "local-sd": "free on your own GPU",
   demo: "offline placeholder art, not AI",
+  wangp: "free on your own GPU via WanGP",
 };
 
 /* Keys that already mean "results per request". The composer shows one batch

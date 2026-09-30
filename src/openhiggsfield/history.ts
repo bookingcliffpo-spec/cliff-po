@@ -1,5 +1,6 @@
 import { browserLegacy, defaultKv, type Kv, type LegacyStore } from "./idb";
 import type { Surface } from "@/generation/catalog";
+import type { Direction } from "@/generation/cinema";
 
 export type RunStatus = "running" | "completed" | "failed";
 
@@ -28,6 +29,11 @@ export interface RunRecord {
   /** Resolved catalog settings this run was submitted with, so reuse can
       restore the dials and not just the words. Absent on pre-existing records. */
   settings?: Record<string, unknown>;
+  /** The Director's notes the run was made with (video), for reuse. */
+  direction?: Direction;
+  /** Live progress of a running run, 0–100, when the provider reports it. */
+  progress?: number;
+  phase?: string;
 }
 
 export const HISTORY_KEY = "history.v1";

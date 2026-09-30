@@ -68,6 +68,9 @@ function slotsOf(runs: ActiveRun[], items: RunRecord[]): Slot[] {
           modelLabel: item.modelLabel,
           ratio: item.ratio,
           startedAt: item.createdAt,
+          requestId: item.requestId,
+          progress: item.progress,
+          phase: item.phase,
         },
       });
       return;
@@ -341,6 +344,7 @@ export const Gallery = memo(function Gallery({
   onFavorite,
   onDownload,
   onDelete,
+  onCancel,
   onStarter,
   galleryRef,
 }: {
@@ -356,6 +360,7 @@ export const Gallery = memo(function Gallery({
   onFavorite: (item: RunRecord) => void;
   onDownload: (item: RunRecord) => Promise<void>;
   onDelete: (item: RunRecord) => void;
+  onCancel?: (requestId: string) => Promise<void> | void;
   onStarter: (prompt: string) => void;
   galleryRef: RefObject<HTMLDivElement | null>;
 }) {
@@ -391,6 +396,7 @@ export const Gallery = memo(function Gallery({
         onFavorite={onFavorite}
         onDownload={onDownload}
         onDelete={onDelete}
+        onCancel={onCancel}
       />
     </div>
   );
@@ -409,6 +415,7 @@ function VirtualizedGrid({
   onFavorite,
   onDownload,
   onDelete,
+  onCancel,
 }: {
   scrollRef: RefObject<HTMLDivElement | null>;
   selecting: boolean;
@@ -422,6 +429,7 @@ function VirtualizedGrid({
   onFavorite: (item: RunRecord) => void;
   onDownload: (item: RunRecord) => Promise<void>;
   onDelete: (item: RunRecord) => void;
+  onCancel?: (requestId: string) => Promise<void> | void;
 }) {
   const width = useInnerWidth(scrollRef);
   const slots = useMemo(() => slotsOf(runs, items), [runs, items]);
@@ -462,7 +470,7 @@ function VirtualizedGrid({
           >
             {slice.map((slot) =>
               slot.kind === "run" ? (
-                <RunningTile key={slot.key} run={slot.run} />
+                <RunningTile key={slot.key} run={slot.run} onCancel={onCancel} />
               ) : (
                 <Tile
                   key={slot.key}
@@ -547,7 +555,14 @@ function Empty({
   );
 }
 
-function RunningTile({ run }: { run: ActiveRun }) {
+function RunningTile({
+  run,
+  onCancel,
+}: {
+  run: ActiveRun;
+  onCancel?: (requestId: string) => Promise<void> | void;
+}) {
+  const [canceling, setCanceling] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -563,10 +578,30 @@ function RunningTile({ run }: { run: ActiveRun }) {
       role="status"
       aria-label={`${run.modelLabel} rendering`}
     >
-      <span className="ohf-skeleton-label">Rendering</span>
+      <span className="ohf-skeleton-label">
+        {run.phase ? run.phase : "Rendering"}
+        {typeof run.progress === "number" && run.progress > 0 ? ` · ${Math.round(run.progress)}%` : ""}
+      </span>
       <span className="ohf-skeleton-clock">
         {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}
       </span>
+      {typeof run.progress === "number" && run.progress > 0 && (
+        <span className="ohf-skeleton-progress" aria-hidden style={{ width: `${Math.min(100, run.progress)}%` }} />
+      )}
+      {onCancel && run.requestId && (
+        <button
+          type="button"
+          className="ohf-skeleton-cancel"
+          disabled={canceling}
+          aria-label={`Cancel ${run.modelLabel} run`}
+          onClick={() => {
+            setCanceling(true);
+            void Promise.resolve(onCancel(run.requestId!)).finally(() => setCanceling(false));
+          }}
+        >
+          {canceling ? "Canceling…" : "Cancel"}
+        </button>
+      )}
     </div>
   );
 }

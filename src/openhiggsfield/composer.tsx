@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
-import { parseSettings } from "@/generation/catalog";
+import { parseSettings, promptRequired } from "@/generation/catalog";
 import type { ModelEntry, Surface } from "@/generation/catalog";
 import type { StorageDriver } from "@/generation/storage/config";
 import { MAX_BATCH, useActive } from "@/generation/stores/active";
@@ -12,6 +12,8 @@ import { useSettings } from "@/generation/stores/settings";
 
 import { swatchFor } from "./artwork";
 import { AssetPicker } from "./asset-picker";
+import { DirectorPanel, directionCount } from "./director-panel";
+import { useDirection } from "@/generation/stores/direction";
 import { PROMPT_PLACEHOLDERS, countSetting } from "./data";
 import type { RunRecord } from "./history";
 import { ArrowUpIcon, CaretDownIcon, CloseIcon, MinusIcon, PlusIcon, WarningIcon } from "./icons";
@@ -25,6 +27,7 @@ import { SettingPill, SettingPopover } from "./settings";
    closed union. */
 const PICKER = "picker";
 const ASSETS = "assets";
+const DIRECTOR = "director";
 const SETTING = "setting:";
 
 const PROMPT_MAX_HEIGHT = 168;
@@ -38,7 +41,7 @@ const POPOVER_GAP = 8;
 
 /** Declared widths keep an opening popover inside the composer's own column. */
 function popoverWidth(id: string, model: ModelEntry): number {
-  if (id === PICKER || id === ASSETS) return 560;
+  if (id === PICKER || id === ASSETS || id === DIRECTOR) return 560;
   /* A list of an enum's values is the narrow panel; a slider needs its travel. */
   if (id.startsWith(SETTING) && model.settings[id.slice(SETTING.length)]?.type === "enum") {
     return 216;
@@ -99,6 +102,9 @@ export function Composer({
   const settings = useSettings();
   const values = parseSettings(model, settings.byModel[model.id] ?? {}, "lenient");
   const tray = useMediaTray(model, onError, storage);
+  const direction = useDirection((state) => state.direction);
+  const directionOn = useDirection((state) => state.enabled);
+  const directed = directionOn ? directionCount(direction) : 0;
 
   const [openOverlay, setOverlay] = useState<string | null>(null);
   /* A panel anchored to a control the visitor can no longer see is a stray
@@ -111,7 +117,10 @@ export function Composer({
   const promptRef = useRef<HTMLTextAreaElement>(null);
   /* A run in flight is not a lock: it holds its own tile in the grid, so the
      only thing that can stop a press is having nothing to say. */
-  const disabled = prompt.text.trim().length === 0;
+  const attached: Record<string, unknown[]> = {};
+  for (const item of tray.items) (attached[item.role] ??= []).push(item);
+  const needsWords = promptRequired(model, attached, values);
+  const disabled = needsWords && prompt.text.trim().length === 0;
 
   /* One batch control, two mechanisms. A model that declares its own
      results-per-request gets that setting written; the rest are submitted once
@@ -252,6 +261,7 @@ export function Composer({
           </div>
         )}
 
+        {overlay === DIRECTOR && surface === "video" && <DirectorPanel />}
         {settingKey && <SettingPopover model={model} settingKey={settingKey} values={values} />}
         {overlay === ASSETS && (
           <AssetPicker
@@ -373,6 +383,21 @@ export function Composer({
                     onOpen={(trigger) => toggle(`${SETTING}${key}`, trigger)}
                   />
                 ))}
+
+                {surface === "video" && (
+                  <button
+                    type="button"
+                    className="ohf-ctl ohf-tip"
+                    data-tip="Director's Panel — genre, camera, lens, moves, color, light"
+                    aria-label={directed > 0 ? `Director's Panel, ${directed} choices` : "Director's Panel"}
+                    aria-expanded={overlay === DIRECTOR}
+                    aria-haspopup="dialog"
+                    onClick={(event) => toggle(DIRECTOR, event.currentTarget)}
+                  >
+                    <span className="ohf-ctl-name">Director</span>
+                    {directed > 0 && <span className="ohf-ctl-count">{directed}</span>}
+                  </button>
+                )}
 
                 <BatchStepper value={batchValue} counts={counts} onChange={setBatchValue} />
               </div>
