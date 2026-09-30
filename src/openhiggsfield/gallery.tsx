@@ -427,6 +427,7 @@ function VirtualizedGrid({
   const slots = useMemo(() => slotsOf(runs, items), [runs, items]);
   const rows = Math.max(1, Math.ceil(slots.length / COLUMNS));
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual is not memoizable; this component opts out of compiler memoization knowingly
   const virtualizer = useVirtualizer({
     count: rows,
     getScrollElement: () => scrollRef.current,
