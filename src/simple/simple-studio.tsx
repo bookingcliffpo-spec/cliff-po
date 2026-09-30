@@ -110,6 +110,7 @@ export function SimpleStudio({ fontClassName = "" }: { fontClassName?: string })
   const [history, setHistory] = useState<RunRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(false);
   const alive = useRef(true);
   const historyRef = useRef(history);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -309,6 +310,10 @@ export function SimpleStudio({ fontClassName = "" }: { fontClassName?: string })
   function onDrop(event: DragEvent) {
     event.preventDefault();
     setDragging(false);
+    if (status !== null && storage === null) {
+      setSetupOpen(true);
+      return;
+    }
     addFiles(event.dataTransfer.files);
   }
 
@@ -403,6 +408,17 @@ export function SimpleStudio({ fontClassName = "" }: { fontClassName?: string })
   const ready = Boolean(plan) && !uploading && !submitting;
   const buttonLabel = submitting ? "Starting…" : uploading ? "Uploading…" : "Generate";
   const noVideoBackend = status !== null && !targets.some((t) => isVideoTarget(t.id));
+  /* Nowhere to put a file (the hosted site with no GPU and no storage): say so
+     up front instead of letting an upload fail with a configuration error. */
+  const uploadsOff = status !== null && storage === null;
+  const openPicker = () => {
+    if (uploadsOff) {
+      setSetupOpen(true);
+      document.getElementById("sp-setup")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    fileRef.current?.click();
+  };
 
   /* ---------- render ---------- */
 
@@ -431,11 +447,12 @@ export function SimpleStudio({ fontClassName = "" }: { fontClassName?: string })
             role="button"
             tabIndex={0}
             aria-label="Upload images or a video"
-            onClick={() => fileRef.current?.click()}
+            data-off={uploadsOff}
+            onClick={openPicker}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
-                fileRef.current?.click();
+                openPicker();
               }
             }}
             onDragOver={(event) => {
@@ -445,7 +462,15 @@ export function SimpleStudio({ fontClassName = "" }: { fontClassName?: string })
             onDragLeave={() => setDragging(false)}
             onDrop={onDrop}
           >
-            {uploads.length === 0 ? (
+            {uploadsOff ? (
+              <span className="sp-drop-empty">
+                <strong>Photos &amp; videos work when your computer runs the studio</strong>
+                <span>
+                  This online version makes free images from your prompt. To animate your own photos or edit
+                  videos for free, start it on your PC — tap to see how.
+                </span>
+              </span>
+            ) : uploads.length === 0 ? (
               <span className="sp-drop-empty">
                 <strong>Upload images or a video</strong>
                 <span>Drop files here, or tap to choose from your phone or computer (optional)</span>
@@ -586,7 +611,7 @@ export function SimpleStudio({ fontClassName = "" }: { fontClassName?: string })
                 </label>
               )}
 
-              {video && (
+              {video && storage !== null && (
                 <div className="sp-slots">
                   <SlotButton label="Start frame" upload={start} onPick={() => pickFor("start")} onClear={() => setStart(null)} />
                   <SlotButton label="End frame" upload={end} onPick={() => pickFor("end")} onClear={() => setEnd(null)} />
@@ -680,9 +705,14 @@ export function SimpleStudio({ fontClassName = "" }: { fontClassName?: string })
           </div>
         </main>
 
-        {noVideoBackend && (
-          <details className="sp-setup">
-            <summary>Want free video? Run it on your computer</summary>
+        {(noVideoBackend || uploadsOff) && (
+          <details
+            id="sp-setup"
+            className="sp-setup"
+            open={setupOpen}
+            onToggle={(event) => setSetupOpen((event.currentTarget as HTMLDetailsElement).open)}
+          >
+            <summary>Free video from your photos: run it on your computer</summary>
             <ol>
               <li>
                 Install <a href="https://github.com/deepbeepmeep/Wan2GP" target="_blank" rel="noopener">WanGP</a> on a PC with an NVIDIA GPU.
@@ -690,8 +720,12 @@ export function SimpleStudio({ fontClassName = "" }: { fontClassName?: string })
               <li>
                 Run <code>start-free-studio</code> from this project (see the README) — it starts the model and this page together.
               </li>
-              <li>Open the address it prints on your phone or any computer on the same Wi-Fi.</li>
+              <li>Open the address it prints on your phone or any computer on the same Wi-Fi — uploads then go straight to your PC.</li>
             </ol>
+            <p className="sp-note">
+              Prefer not to run anything? Video from photos is also possible with a Higgsfield key (paid credits) —
+              that needs the site owner to add it and upload storage.
+            </p>
           </details>
         )}
 

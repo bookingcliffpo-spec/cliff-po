@@ -118,6 +118,13 @@
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
+.sp-drop[data-off="true"] {
+  border-style: solid;
+  border-color: var(--line);
+}
+.sp-drop[data-off="true"] .sp-drop-empty span {
+  max-width: 460px;
+}
 .sp-drop:hover,
 .sp-drop[data-dragging="true"] {
   border-color: var(--accent);
@@ -435,6 +442,10 @@
 .sp-setup summary {
   cursor: pointer;
   font-weight: 600;
+  color: var(--tx);
+}
+.sp-setup[open] {
+  border-color: rgba(209, 254, 23, 0.35);
 }
 .sp-setup a {
   color: var(--accent);

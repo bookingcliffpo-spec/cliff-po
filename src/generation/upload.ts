@@ -29,7 +29,7 @@ export async function uploadMedia(file: File, options: UploadOptions): Promise<{
   if (problem) throw new UploadError(problem);
   if (!options.driver) {
     throw new UploadError(
-      "Upload failed — no storage is configured on the server. Set OPEN_HIGGSFIELD_READ_WRITE_TOKEN or STORAGE_DRIVER=local.",
+      "Uploads aren't available here — this server has nowhere to keep files. Run the free studio on your computer (uploads go to your PC), or add upload storage (OPEN_HIGGSFIELD_READ_WRITE_TOKEN or STORAGE_DRIVER=local).",
     );
   }
   const { url } =

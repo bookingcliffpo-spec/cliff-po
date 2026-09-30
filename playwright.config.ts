@@ -5,6 +5,7 @@ import { defineConfig, devices } from "@playwright/test";
 const APP_PORT = 3100;
 const MOCK_PORT = 4010;
 export const FREE_PORT = 3200;
+export const HOSTED_PORT = 3300;
 export const BRIDGE_PORT = 7871;
 const BRIDGE_TOKEN = "e2e-bridge-token";
 const API_KEY = "e2e_id:e2e_secret_value_123456";
@@ -82,6 +83,14 @@ export default defineConfig({
         WANGP_URL: `http://127.0.0.1:${BRIDGE_PORT}`,
         WANGP_TOKEN: BRIDGE_TOKEN,
       },
+    },
+    {
+      /* Like the hosted site: no GPU, no key, no storage. */
+      command: `pnpm start -p ${HOSTED_PORT}`,
+      url: `http://127.0.0.1:${HOSTED_PORT}/api/health`,
+      timeout: 120_000,
+      reuseExistingServer: false,
+      env: { HF_API_BASE_URL: "", HF_API_KEY: "", APP_PASSWORD: "", WANGP_URL: "", STORAGE_DRIVER: "", LOCAL_SD_URL: "" },
     },
   ],
 });
