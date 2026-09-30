@@ -1,3 +1,5 @@
+import { GenerationError, MESSAGES } from "./errors";
+
 export const PLATFORM_KEY_COOKIE = "api_key";
 
 export const PLATFORM_KEY_COOKIE_OPTIONS = {
@@ -8,11 +10,15 @@ export const PLATFORM_KEY_COOKIE_OPTIONS = {
   maxAge: 60 * 60 * 24 * 30,
 };
 
-export class MissingCredentialsError extends Error {
-  constructor() {
-    super("Missing platform key");
-    this.name = "MissingCredentialsError";
-  }
+/** A key is `id:secret` — both halves non-empty, no whitespace inside. Returns
+    the trimmed key, or null when the shape is wrong. */
+export function normalizeApiKey(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const key = raw.trim();
+  if (!key || /\s/.test(key)) return null;
+  const colon = key.indexOf(":");
+  if (colon <= 0 || colon === key.length - 1) return null;
+  return key;
 }
 
 export function encodeCredentials(apiKey: string): string {
@@ -24,32 +30,32 @@ export function decodeCredentials(raw: string | undefined): { apiKey: string } |
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-    const apiKey = (parsed as { apiKey?: unknown }).apiKey;
-    if (typeof apiKey !== "string" || !apiKey.trim()) return null;
-    return { apiKey: requireIdAndSecret(apiKey.trim()) };
+    const apiKey = normalizeApiKey((parsed as { apiKey?: unknown }).apiKey);
+    return apiKey ? { apiKey } : null;
   } catch {
     return null;
   }
 }
 
+/** Reads the key a visitor typed into the studio. Throws GenerationError so the
+    action wrapper can hand the message back as data. */
 export function parseCredentialInput(data: unknown): { apiKey: string } {
   if (data === null || typeof data !== "object" || Array.isArray(data)) {
-    throw new Error("Enter an API key");
+    throw new GenerationError("invalid_request", "Enter an API key.");
   }
   const record = data as { apiKey?: unknown; api_key?: unknown };
-  const apiKey = record.apiKey ?? record.api_key;
-  if (typeof apiKey !== "string" || !apiKey.trim()) throw new Error("Enter an API key");
-  return { apiKey: requireIdAndSecret(apiKey.trim()) };
-}
-
-export function toAuthorizationHeader(apiKey: string): string {
-  return `Key ${requireIdAndSecret(apiKey)}`;
-}
-
-function requireIdAndSecret(apiKey: string): string {
-  const colon = apiKey.indexOf(":");
-  if (colon <= 0 || colon === apiKey.length - 1) {
-    throw new Error("API key must be id:secret");
+  const raw = record.apiKey ?? record.api_key;
+  if (typeof raw !== "string" || !raw.trim()) {
+    throw new GenerationError("invalid_request", "Enter an API key.");
   }
-  return apiKey;
+  const apiKey = normalizeApiKey(raw);
+  if (!apiKey) throw new GenerationError("invalid_api_key", MESSAGES.keyFormat);
+  return { apiKey };
+}
+
+/** The provider's scheme: `Authorization: Key <id:secret>`. */
+export function toAuthorizationHeader(apiKey: string): string {
+  const key = normalizeApiKey(apiKey);
+  if (!key) throw new GenerationError("invalid_api_key", MESSAGES.keyFormat);
+  return `Key ${key}`;
 }

@@ -22,7 +22,7 @@ import { ltx25Fast } from "./ltx-2.5-fast";
 import { ltx25Pro } from "./ltx-2.5-pro";
 import { minimaxH3 } from "./minimax-h3";
 import { minimaxHailuo23 } from "./minimax-hailuo-2.3";
-import { parseSettings } from "./parse-settings";
+import { InvalidSettingError, parseSettings } from "./parse-settings";
 import { pixverse6 } from "./pixverse-6";
 import { qwenImage3 } from "./qwen-image-3";
 import { recraft41 } from "./recraft-4.1";
@@ -77,11 +77,15 @@ export const MODELS: readonly ModelEntry[] = [
   dop,
 ];
 
+export function findModel(id: unknown): ModelEntry | undefined {
+  return typeof id === "string" ? MODELS.find((entry) => entry.id === id) : undefined;
+}
+
 export function getModel(id: string): ModelEntry {
-  const model = MODELS.find((entry) => entry.id === id);
+  const model = findModel(id);
   if (!model) throw new Error(`Unknown model: ${id}`);
   return model;
 }
 
 export type { GenerationPlane, MediaItem, MediaRole, ModelEntry, PlatformPaths, Surface } from "./types";
-export { parseSettings };
+export { InvalidSettingError, parseSettings };

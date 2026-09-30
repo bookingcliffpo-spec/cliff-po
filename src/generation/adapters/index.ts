@@ -1,8 +1,11 @@
-import { getModel } from "./catalog";
-import type { GenerationPlane, PlatformPaths } from "./catalog/types";
+import { getModel } from "../catalog";
+import type { GenerationPlane, PlatformPaths } from "../catalog/types";
+import { GenerationError } from "../errors";
+import { SEEDANCE_PATHS, SEEDANCE_SOURCE_PATHS, mapSeedance, mapSeedanceSource } from "./seedance";
+import { urls, type Mapped, type Mapper } from "./types";
 
-type Mapped = { path: string; body: Record<string, unknown> };
-type Mapper = (plane: GenerationPlane) => Mapped;
+/** Model id → provider request. Soul, Kling 3 and Seedance keep their own
+    mappers; every other catalog entry declares `paths` and uses the shared one. */
 
 const MAP: Record<string, Mapper> = {
   "soul-cinema": (plane) => mapSoul(plane, "higgsfield-ai/soul/cinema"),
@@ -13,23 +16,22 @@ const MAP: Record<string, Mapper> = {
   "kling-3-4k": (plane) => mapKling3(plane, "kling-video/v3.0/4k"),
   "kling-3-motion-std": (plane) => mapKlingMotion(plane, "kling-video/v3/motion-control/std"),
   "kling-3-motion-pro": (plane) => mapKlingMotion(plane, "kling-video/v3/motion-control/pro"),
-  "seedance-2": (plane) => mapSeedance(plane, "bytedance/seedance-2.0"),
-  "seedance-2-fast": (plane) => mapSeedance(plane, "bytedance/seedance-2.0/fast"),
-  "seedance-2-mini": (plane) => mapSeedance(plane, "bytedance/seedance-2.0/mini"),
-  "seedance-2.5": (plane) => mapSeedance(plane, "bytedance/seedance-2.5"),
-  "seedance-2.5-edit": (plane) => mapSeedanceSource(plane, "bytedance/seedance-2.5/video-edit", false),
-  "seedance-2.5-extend": (plane) => mapSeedanceSource(plane, "bytedance/seedance-2.5/video-extend", true),
+  ...Object.fromEntries(
+    Object.entries(SEEDANCE_PATHS).map(([id, prefix]) => [id, (plane: GenerationPlane) => mapSeedance(plane, prefix)]),
+  ),
+  ...Object.fromEntries(
+    Object.entries(SEEDANCE_SOURCE_PATHS).map(([id, spec]) => [
+      id,
+      (plane: GenerationPlane) => mapSeedanceSource(plane, spec.path, spec.withDuration),
+    ]),
+  ),
 };
 
 export function toPlatform(plane: GenerationPlane): Mapped {
   const model = getModel(plane.model);
   const map = MAP[model.id] ?? (model.paths ? (next) => mapByPaths(next, model.paths!) : undefined);
-  if (!map) throw new Error(`No platform map for ${plane.model}`);
+  if (!map) throw new GenerationError("invalid_model", `Invalid model — no provider mapping for ${model.id}.`);
   return map(plane);
-}
-
-function urls(plane: GenerationPlane, role: "start" | "end" | "reference" | "video" | "audio") {
-  return (plane.media[role] ?? []).map((item) => item.url);
 }
 
 function mapSoul(plane: GenerationPlane, path: string): Mapped {
@@ -140,62 +142,5 @@ function mapByPaths(plane: GenerationPlane, spec: PlatformPaths): Mapped {
   if (spec.image) return { path: spec.image, body };
   if (spec.reference) return { path: spec.reference, body };
   if (spec.firstLast) return { path: spec.firstLast, body };
-  throw new Error("Model has no platform path");
-}
-
-function seedanceBody(plane: GenerationPlane, withDuration: boolean) {
-  return {
-    prompt: plane.prompt.text,
-    resolution: plane.settings.resolution,
-    generate_audio: plane.settings.generateAudio,
-    ...(withDuration ? { duration: plane.settings.duration } : {}),
-    ...(plane.settings.outputFormat ? { output_format: plane.settings.outputFormat } : {}),
-  };
-}
-
-function mapSeedance(plane: GenerationPlane, prefix: string): Mapped {
-  const start = urls(plane, "start")[0];
-  const end = urls(plane, "end")[0];
-  const refs = urls(plane, "reference");
-  const videos = urls(plane, "video");
-  const audios = urls(plane, "audio");
-  const shared = seedanceBody(plane, true);
-  if (start) {
-    return {
-      path: `${prefix}/image-to-video`,
-      body: { ...shared, image_url: start, ...(end ? { end_image_url: end } : {}) },
-    };
-  }
-  if (refs.length || videos.length || audios.length) {
-    return {
-      path: `${prefix}/reference-to-video`,
-      body: {
-        ...shared,
-        aspect_ratio: plane.settings.aspectRatio,
-        ...(refs.length ? { image_urls: refs } : {}),
-        ...(videos.length ? { video_urls: videos } : {}),
-        ...(audios.length ? { audio_urls: audios } : {}),
-      },
-    };
-  }
-  return {
-    path: `${prefix}/text-to-video`,
-    body: { ...shared, aspect_ratio: plane.settings.aspectRatio },
-  };
-}
-
-function mapSeedanceSource(plane: GenerationPlane, path: string, withDuration: boolean): Mapped {
-  const [video, ...extraVideos] = urls(plane, "video");
-  const refs = urls(plane, "reference");
-  const audios = urls(plane, "audio");
-  return {
-    path,
-    body: {
-      ...seedanceBody(plane, withDuration),
-      ...(video ? { video_url: video } : {}),
-      ...(refs.length ? { image_urls: refs } : {}),
-      ...(extraVideos.length ? { video_urls: extraVideos } : {}),
-      ...(audios.length ? { audio_urls: audios } : {}),
-    },
-  };
+  throw new GenerationError("invalid_model", "Invalid model — no provider path for these inputs.");
 }
