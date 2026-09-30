@@ -24,3 +24,6 @@ playwright-report
 test-results
 blob-report
 .uploads-e2e
+.bridge-e2e
+bridge-outputs
+__pycache__

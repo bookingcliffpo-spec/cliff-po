@@ -29,9 +29,8 @@ topbar says so), offering only the models that need no key:
 Everything else — batch, gallery, favorites, reuse, download, delete + undo,
 history — works the same in free mode.
 
-**What free mode cannot do:** video. There is no free, keyless video
-generation service; video needs `HF_API_KEY` (or a key pasted in the studio).
-Image inputs (start frames, references) are also only used by the paid models.
+**Video is free on your own GPU** through WanGP (next section). No hosted
+service offers free, keyless video, so without a GPU video needs `HF_API_KEY`.
 
 ```bash
 pnpm install
@@ -50,6 +49,61 @@ Turn the hosted or demo models off with `FREE_PROVIDERS` (e.g.
 `HF_API_KEY` later unlocks the paid models alongside the free ones.
 
 Next.js 16 App Router · React 19 · plain CSS · Zustand · pnpm
+
+---
+
+## Free video on your GPU — WanGP
+
+[WanGP](https://github.com/deepbeepmeep/Wan2GP) runs open video models
+(LTX-2.3, Wan 2.2, Kiwi-Edit…) on consumer GPUs. `bridge/wangp_bridge.py`
+drives WanGP through its documented Python API (`shared.api`: `init`,
+`submit_task`, progress events, `cancel`) and gives the studio a small
+authenticated HTTP job API. The studio's Video tab then offers:
+
+| Studio model | Higgsfield equivalent | WanGP model (override with `WANGP_MODEL_<ACTION>`) |
+| --- | --- | --- |
+| **Cinema Video · Free GPU** | Seedance 2.5 text-to-video, image-to-video, start + end frame, native audio, audio reference | `ltx2_22B_distilled` (LTX-2.3 makes the soundtrack in the same pass) |
+| **Reference to Video · Free GPU** | Seedance reference-to-video (character / face / product / wardrobe / location / style refs) | `ltx2_22B_msr` (up to 5 references; a *location* ref becomes the background) |
+| **Video Edit · Free GPU** | Seedance Video Edit + Regional Edit | `kiwi_edit` with a reference, `kiwi_edit_instruct_only` without |
+| **Video Extend · Free GPU** | Forward / Backward Extend | `ltx2_22B_distilled` continuation; backward = reverse → continue → reverse |
+| **Motion Transfer · Free GPU** | Genjutsu Motion Transfer / character replacement | `animate` (Wan 2.2 Animate: animate your character, or replace the person) |
+| **Swap & Restyle · Free GPU** | Genjutsu Object Swap: character, face, product, wardrobe, location, object + 26 promptless style/scene presets, keep motion / camera / timing / background | `ltx2_22B_distilled_edit_anything` with a reference, Kiwi-Edit without |
+
+Every video model (paid or free) also gets the **Director's Panel** —
+genre, era, tempo, camera body (35mm, 8mm, DV camcorder…), lens, aperture,
+24 camera moves (POV, robot arm, helicopter…), 52 color palettes, 6 lighting
+presets, custom light color, brightness, diffusion, light angle and emotion
+strength — compiled into the prompt, with a live preview. Runs show live
+progress and can be **canceled**; failed runs can be reused and re-rolled.
+
+Setup, on the machine with the GPU:
+
+```bash
+# 1. Install WanGP (see its README) and check it works in its own UI once.
+# 2. Start the bridge with WanGP's Python environment:
+python bridge/wangp_bridge.py --wangp-root /path/to/Wan2GP --token <long-random-secret> \
+    --wangp-args "--attention sdpa --profile 4"
+# 3. Point the studio at it:
+WANGP_URL=http://127.0.0.1:7870 WANGP_TOKEN=<same-secret> pnpm start
+```
+
+For uploads (start frames, reference images, source clips) the bridge must be
+able to download the file: running the studio on the same machine with
+`STORAGE_DRIVER=local PUBLIC_BASE_URL=http://127.0.0.1:3000` works.
+
+Using a hosted studio (e.g. Vercel) with WanGP at home: expose the bridge
+with a free tunnel such as `cloudflared tunnel --url http://127.0.0.1:7870`,
+keep `--token` set, and set `WANGP_URL` / `WANGP_TOKEN` in the hosting
+environment.
+
+Honest limits: speed and quality depend on your GPU (LTX-2.3 distilled wants
+~12 GB+ VRAM; quantized variants go lower — see WanGP's docs). Motion
+"replace the person" mode and instruction-based swaps are best-effort; hard
+cases need WanGP's own mask editor. Higgsfield-only features with no open
+equivalent here: high-bitrate output and Higgsfield's hosted regional
+re-roll. This product uses WanGP; WanGP's terms apply.
+
+Try the bridge without WanGP or a GPU: `python bridge/wangp_bridge.py --fake`.
 
 ---
 
@@ -211,6 +265,11 @@ the repository.
 | `Could not reach the local Stable Diffusion server…` | Start it with `--api` and check `LOCAL_SD_URL` is reachable from the studio server. |
 | `Video needs a provider key…` | Expected in free mode — there is no free video model. |
 | `This model needs an API key…` | You picked a paid model with no key; pick a free one or add a key. |
+| `WanGP is not connected…` | Set `WANGP_URL` (and `WANGP_TOKEN`) to the running bridge. |
+| `Could not reach the WanGP bridge…` | The bridge is down, or the studio server cannot reach it (tunnel down, wrong port). `curl $WANGP_URL/v1/health`. |
+| `The WanGP bridge rejected the token` | `WANGP_TOKEN` differs from the bridge's `--token`. |
+| A GPU run fails with a WanGP message (e.g. out of memory) | Lower resolution/duration, pick a quantized model via `WANGP_MODEL_*`, or a lower-VRAM `--profile` in `--wangp-args`. |
+| `Could not download an input` (GPU run) | The bridge cannot fetch the uploaded file — use local storage with a `PUBLIC_BASE_URL` the bridge can reach. |
 | Browser asks for a username/password | `APP_PASSWORD` is set: any username, that password. |
 | Old runs show blank tiles | Result URLs belong to the provider's CDN and can expire; history is kept per browser in IndexedDB. |
 

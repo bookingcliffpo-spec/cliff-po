@@ -52,6 +52,26 @@ alone — without a key — and ids that decode to URLs the server would not hav
 produced are refused. A fresh random seed per press makes a batch of four
 four different images.
 
+## Free GPU video (WanGP)
+
+```
+studio (Next)                          your GPU machine
+submitGeneration ─ adapters/wangp.ts ─▶ bridge/wangp_bridge.py ─▶ WanGP shared.api
+  (model → WanGP settings + post)       POST /v1/jobs             session.submit_task
+getGenerationStatuses ────────────────▶ GET  /v1/jobs/<id>        progress callbacks
+cancelGeneration ─────────────────────▶ POST /v1/jobs/<id>/cancel job.cancel()
+/api/wangp/files/<name> ──────────────▶ GET  /v1/files/<name>     outputs (+ ffmpeg post)
+```
+
+- Request ids are `wg_<job id>`; the bridge holds job state in memory, so a
+  bridge restart forgets running jobs (the studio then marks them failed on
+  the next poll with "does not know this job").
+- WanGP infers most mode flags from the media supplied; the adapter sets only
+  control-video flags (`UV`, `UVI`, `VGI`, `PVBKI`, `PVBAIH#`, `I`/`KI`).
+- GPU jobs get a 4-hour deadline instead of the hosted 10/25 minutes.
+- The Director's Panel is compiled client-side into the prompt; history keeps
+  the raw words and the direction separately.
+
 ## Error contract
 
 `src/generation/result.ts`

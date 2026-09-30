@@ -24,6 +24,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
+      - run: pnpm test:bridge
       - run: pnpm exec playwright install --with-deps chromium
       # Builds the app for production and runs it against a mocked provider.
       # No real credentials are used or needed.

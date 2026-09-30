@@ -12,7 +12,9 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
-    "brand": "node scripts/build-brand-assets.mjs"
+    "brand": "node scripts/build-brand-assets.mjs",
+    "test:bridge": "python3 -m unittest discover -s tests/bridge",
+    "bridge:fake": "python3 bridge/wangp_bridge.py --fake"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.14.10",
