@@ -17,6 +17,7 @@ when a token is configured):
     POST /v1/jobs                    {"settings": {...}, "post": {...}} -> {"id"}
     GET  /v1/jobs/<id>               -> {"status", "progress", "phase", "error", "files"}
     POST /v1/jobs/<id>/cancel        -> {"ok": true}
+    POST /v1/uploads                 raw body + Content-Type -> {"name"}
     GET  /v1/files/<name>            -> the output file (supports Range)
 """
 
@@ -399,6 +400,8 @@ def make_handler(bridge: Bridge, token: str | None):
                     return self._json(200, {"ok": True, "mode": "fake" if bridge.args.fake else "wangp"})
                 if not self._authorized():
                     return self._json(401, {"error": "Missing or wrong bridge token."})
+                if path == "/v1/uploads" and method == "POST":
+                    return self._json(200, {"name": self._upload()})
                 if path == "/v1/jobs" and method == "POST":
                     job = bridge.submit(self._body())
                     return self._json(200, {"id": job.id})
@@ -419,6 +422,35 @@ def make_handler(bridge: Bridge, token: str | None):
                 return self._json(error.status, {"error": str(error)})
             except Exception as error:  # noqa: BLE001
                 return self._json(500, {"error": f"Bridge error: {type(error).__name__}"})
+
+        def _upload(self) -> str:
+            """Stores an input file (image / video / audio) sent by the studio,
+            so uploads need no cloud storage in the free local setup. The name
+            is random; the studio refers to it as /api/wangp/files/<name>."""
+            content_type = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            ext = MEDIA_EXT.get(content_type)
+            if not ext:
+                raise BridgeError(f"Unsupported upload type {content_type or 'unknown'}.", 415)
+            length = int(self.headers.get("Content-Length") or 0)
+            limit = bridge.args.max_download_mb * 1024 * 1024
+            if length <= 0:
+                raise BridgeError("The upload is empty.")
+            if length > limit:
+                raise BridgeError(f"Upload larger than {bridge.args.max_download_mb} MB.", 413)
+            name = f"up_{secrets.token_hex(16)}{ext}"
+            target = bridge.output_dir / name
+            remaining = length
+            with open(target, "wb") as out:
+                while remaining > 0:
+                    chunk = self.rfile.read(min(1024 * 256, remaining))
+                    if not chunk:
+                        break
+                    out.write(chunk)
+                    remaining -= len(chunk)
+            if remaining:
+                target.unlink(missing_ok=True)
+                raise BridgeError("The upload was cut off.")
+            return name
 
         def _file(self, name: str) -> None:
             if not FILE_NAME.match(name):

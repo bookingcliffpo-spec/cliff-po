@@ -85,6 +85,13 @@ describe("storage configuration", () => {
     });
   });
 
+  it("keeps uploads on the WanGP bridge when it is connected and nothing else is set", () => {
+    expect(readStorageConfig({ WANGP_URL: "http://127.0.0.1:7870" })).toEqual({ driver: "wangp" });
+    /* An explicit or Blob setup still wins. */
+    expect(readStorageConfig({ WANGP_URL: "http://x", OPEN_HIGGSFIELD_READ_WRITE_TOKEN: "t" })).toMatchObject({ driver: "vercel-blob" });
+    expect(() => readStorageConfig({ STORAGE_DRIVER: "wangp" })).toThrow(/needs WANGP_URL/);
+  });
+
   it("names an unknown driver", () => {
     expect(() => readStorageConfig({ STORAGE_DRIVER: "s3" })).toThrow(/STORAGE_DRIVER/);
   });

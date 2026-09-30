@@ -26,8 +26,9 @@ export function assemblePlane(): GenerationPlane {
     const list = media[item.role] ?? [];
     if (list.length >= max) continue;
     /* A preview that never finished uploading has no URL the provider can
-       fetch; it is left off rather than sent. */
-    if (!/^https?:\/\//.test(item.url)) continue;
+       fetch; it is left off rather than sent. Files kept by the WanGP bridge
+       are addressed by a studio path and are fine. */
+    if (!/^https?:\/\//.test(item.url) && !/^\/api\/wangp\/files\//.test(item.url)) continue;
     list.push(item);
     media[item.role] = list;
   }

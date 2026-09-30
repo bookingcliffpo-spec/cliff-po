@@ -146,6 +146,26 @@ class BridgeTest(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertIn("model_type", body["error"])
 
+    def test_upload_then_use_as_input(self):
+        request = urllib.request.Request(self.base + "/v1/uploads", data=PNG, method="POST")
+        request.add_header("Authorization", "Bearer t0ken")
+        request.add_header("Content-Type", "image/png")
+        with urllib.request.urlopen(request, timeout=10) as response:
+            name = json.loads(response.read())["name"]
+        self.assertRegex(name, r"^up_[0-9a-f]{32}\.png$")
+        status, data = self.call("GET", f"/v1/files/{name}")
+        self.assertEqual((status, data), (200, PNG))
+        _, body = self.call("POST", "/v1/jobs", {"settings": {"model_type": "m", "prompt": "x", "image_start": f"/api/wangp/files/{name}"}})
+        self.assertEqual(self.wait(body["id"])["status"], "completed")
+
+    def test_upload_rejects_unknown_types(self):
+        request = urllib.request.Request(self.base + "/v1/uploads", data=b"hello", method="POST")
+        request.add_header("Authorization", "Bearer t0ken")
+        request.add_header("Content-Type", "text/plain")
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(request, timeout=10)
+        self.assertEqual(caught.exception.code, 415)
+
     def test_unknown_job_and_file(self):
         self.assertEqual(self.call("GET", "/v1/jobs/doesnotexist1")[0], 404)
         self.assertEqual(self.call("GET", "/v1/files/..%2Fsecret")[0], 404)

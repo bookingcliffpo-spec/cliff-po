@@ -33,10 +33,15 @@ export async function uploadMedia(file: File, options: UploadOptions): Promise<{
     );
   }
   const { url } =
-    options.driver === "local" ? await uploadLocal(file, options) : await uploadBlob(file, options);
+    options.driver === "local"
+      ? await uploadLocal(file, options, "/api/upload")
+      : options.driver === "wangp"
+        ? await uploadLocal(file, options, "/api/wangp/upload")
+        : await uploadBlob(file, options);
   /* Private hosts are allowed here: whether the provider can reach them is the
-     submit action's call, which knows the server's settings. */
-  const bad = mediaUrlProblem(url, true);
+     submit action's call, which knows the server's settings. Files kept by the
+     WanGP bridge are addressed by a studio path. */
+  const bad = /^\/api\/wangp\/files\/[A-Za-z0-9._-]+$/.test(url) ? null : mediaUrlProblem(url, true);
   if (bad) throw new UploadError(bad);
   options.onProgress?.(1);
   return { url };
@@ -95,10 +100,10 @@ async function uploadBlob(file: File, options: UploadOptions): Promise<{ url: st
 
 /** XMLHttpRequest rather than fetch: it is the only browser API that reports
     upload progress. */
-function uploadLocal(file: File, options: UploadOptions): Promise<{ url: string }> {
+function uploadLocal(file: File, options: UploadOptions, endpoint: string): Promise<{ url: string }> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/upload");
+    xhr.open("POST", endpoint);
     xhr.setRequestHeader("content-type", file.type);
     xhr.setRequestHeader("x-file-size", String(file.size));
     xhr.responseType = "json";

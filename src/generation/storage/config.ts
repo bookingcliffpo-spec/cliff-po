@@ -4,10 +4,11 @@ import { GenerationError } from "../errors";
 
 type Env = Record<string, string | undefined>;
 
-export type StorageDriver = "vercel-blob" | "local";
+export type StorageDriver = "vercel-blob" | "local" | "wangp";
 
 export type StorageConfig =
   | { driver: "vercel-blob"; token: string }
+  | { driver: "wangp" }
   | { driver: "local"; dir: string; publicBaseUrl: string };
 
 /** Where uploads go. Two drivers:
@@ -56,8 +57,18 @@ export function readStorageConfig(env: Env = process.env): StorageConfig | null 
     return { driver: "vercel-blob", token };
   }
 
+  /* The free local setup: with WanGP connected and nothing else configured,
+     uploads are kept by the WanGP bridge on the same machine — no storage
+     account needed. Only WanGP models can read them. */
+  if (explicit === "wangp" || (!explicit && env.WANGP_URL?.trim())) {
+    if (!env.WANGP_URL?.trim()) {
+      throw new GenerationError("missing_config", "STORAGE_DRIVER=wangp needs WANGP_URL.");
+    }
+    return { driver: "wangp" };
+  }
+
   if (explicit) {
-    throw new GenerationError("missing_config", "STORAGE_DRIVER must be 'vercel-blob' or 'local'.");
+    throw new GenerationError("missing_config", "STORAGE_DRIVER must be 'vercel-blob', 'local' or 'wangp'.");
   }
   return null;
 }
