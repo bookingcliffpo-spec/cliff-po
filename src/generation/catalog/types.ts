@@ -1,10 +1,26 @@
 export type Surface = "image" | "video";
 export type MediaRole = "start" | "end" | "reference" | "video" | "audio";
 
+/** What a reference image stands for. The adapters turn tags into prompt
+    language ("use image 2 as the product") for models that read references. */
+export type ReferenceTag = "character" | "face" | "product" | "wardrobe" | "location" | "style" | "object";
+
+export const REFERENCE_TAGS: readonly ReferenceTag[] = [
+  "character",
+  "face",
+  "product",
+  "wardrobe",
+  "location",
+  "style",
+  "object",
+];
+
 export type MediaItem = {
   id: string;
   url: string;
   role: MediaRole;
+  /** Only on reference images. */
+  tag?: ReferenceTag;
 };
 
 export type SettingField =
@@ -20,7 +36,7 @@ export type PlatformPaths = {
 };
 
 /** Who runs a model. Everything except "higgsfield" works without an API key. */
-export type ProviderId = "higgsfield" | "pollinations" | "local-sd" | "demo";
+export type ProviderId = "higgsfield" | "pollinations" | "local-sd" | "demo" | "wangp";
 
 export type ModelEntry = {
   id: string;

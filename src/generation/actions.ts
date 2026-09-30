@@ -15,7 +15,7 @@ import {
 import { toFailure } from "./errors";
 import type { QueuedGeneration, StatusResult } from "./higgsfield/types";
 import { ok, type ActionResult } from "./result";
-import { pollStatuses, submitPlane, type CredentialSource } from "./service";
+import { cancelRequest, pollStatuses, submitPlane, type CredentialSource } from "./service";
 import { storageDriver, type StorageDriver } from "./storage/config";
 
 /* Every export here is a server action and every one returns an ActionResult.
@@ -86,6 +86,11 @@ export async function submitGeneration(plane: unknown): Promise<ActionResult<Que
 /** Every request in flight, answered in one round trip. */
 export async function getGenerationStatuses(data: unknown): Promise<ActionResult<StatusResult[]>> {
   return pollStatuses(data, { cookieApiKey: await readCookieKey() });
+}
+
+/** Stops a queued or running generation. */
+export async function cancelGeneration(data: unknown): Promise<ActionResult<null>> {
+  return cancelRequest(data, { cookieApiKey: await readCookieKey() });
 }
 
 async function readCookieKey(): Promise<string | null> {

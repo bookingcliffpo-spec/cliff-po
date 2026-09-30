@@ -6,6 +6,7 @@ import { isProviderConfigured } from "../config";
 import { GenerationError } from "../errors";
 import type { GenerationStatus } from "../higgsfield/types";
 import { generateLocalSd } from "./local-sd";
+import { wangpConfig } from "./wangp-client";
 
 type Env = Record<string, string | undefined>;
 
@@ -30,6 +31,7 @@ export function freeProviders(env: Env = process.env): ProviderId[] {
   const out: ProviderId[] = [];
   if (enabled.has("pollinations")) out.push("pollinations");
   if (env.LOCAL_SD_URL?.trim()) out.push("local-sd");
+  if (wangpConfig(env)) out.push("wangp");
   if (enabled.has("demo")) out.push("demo");
   return out;
 }

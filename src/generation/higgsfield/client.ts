@@ -139,6 +139,19 @@ export function createHiggsfieldClient(options: HiggsfieldClientOptions) {
       return mapQueued(payload);
     },
 
+    /** Asks the provider to stop a queued or running request. Best effort:
+        a request that already finished simply stays finished. */
+    async cancel(requestId: string, call: CallOptions = {}): Promise<void> {
+      if (!requestId) throw new GenerationError("invalid_request", "Missing request id.", { status: 400 });
+      await exchange(
+        "POST",
+        `/requests/${encodeURIComponent(requestId)}/cancel`,
+        {},
+        options.statusTimeoutMs ?? STATUS_TIMEOUT_MS,
+        call.signal,
+      );
+    },
+
     async status(requestId: string, call: CallOptions = {}): Promise<GenerationStatus> {
       if (!requestId) throw new GenerationError("invalid_request", "Missing request id.", { status: 400 });
       const payload = await withRetry(true, call.signal, () =>

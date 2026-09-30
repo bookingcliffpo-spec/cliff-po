@@ -1,5 +1,5 @@
-import { InvalidSettingError, findModel, parseSettings } from "./catalog";
-import type { GenerationPlane, MediaItem, MediaRole } from "./catalog/types";
+import { InvalidSettingError, REFERENCE_TAGS, findModel, parseSettings, promptRequired, providerOf } from "./catalog";
+import type { GenerationPlane, MediaItem, MediaRole, ReferenceTag } from "./catalog/types";
 import { GenerationError, MESSAGES } from "./errors";
 import { mediaUrlProblem } from "./media-rules";
 
@@ -25,7 +25,6 @@ export function validatePlane(
 
   const promptRecord = raw.prompt as { text?: unknown } | undefined;
   const text = typeof promptRecord?.text === "string" ? promptRecord.text.trim() : "";
-  if (!text) throw new GenerationError("invalid_request", "Write a prompt first.");
   if (text.length > PROMPT_MAX) {
     throw new GenerationError("invalid_request", `The prompt is too long (max ${PROMPT_MAX} characters).`);
   }
@@ -44,6 +43,10 @@ export function validatePlane(
     throw caught;
   }
 
+  /* The WanGP bridge runs on the owner's own machine or network, so it can
+     fetch private addresses, and it can reuse its own earlier outputs. */
+  const wangp = providerOf(model) === "wangp";
+  const allowPrivate = options.allowPrivateMedia || wangp;
   const media: GenerationPlane["media"] = {};
   const rawMedia = raw.media && typeof raw.media === "object" ? (raw.media as Record<string, unknown>) : {};
   for (const [role, list] of Object.entries(rawMedia)) {
@@ -67,14 +70,22 @@ export function validatePlane(
     media[role as MediaRole] = list.map((entry, index): MediaItem => {
       const item = entry as Partial<MediaItem> | null;
       const url = typeof item?.url === "string" ? item.url : "";
-      const problem = mediaUrlProblem(url, options.allowPrivateMedia);
+      const ownOutput = wangp && /^\/api\/wangp\/files\/[A-Za-z0-9._-]+$/.test(url);
+      const problem = ownOutput ? null : mediaUrlProblem(url, allowPrivate);
       if (problem) throw new GenerationError("upload_failed", problem);
+      const tag =
+        role === "reference" && REFERENCE_TAGS.includes(item?.tag as ReferenceTag) ? (item!.tag as ReferenceTag) : undefined;
       return {
         id: typeof item?.id === "string" ? item.id : `${role}-${index}`,
         url,
         role: role as MediaRole,
+        ...(tag ? { tag } : {}),
       };
     });
+  }
+
+  if (!text && promptRequired(model, media, settings)) {
+    throw new GenerationError("invalid_request", "Write a prompt first.");
   }
 
   return { model: model.id, prompt: { text }, media, settings };

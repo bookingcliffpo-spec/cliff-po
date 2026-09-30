@@ -11,6 +11,9 @@ export const POLL_DEADLINE_MS: Record<Surface, number> = {
   image: 10 * 60_000,
   video: 25 * 60_000,
 };
+/** Local GPU jobs wait in WanGP's own queue and a 30-second clip can take
+    well over an hour on a consumer card. */
+export const LOCAL_GPU_DEADLINE_MS = 4 * 60 * 60_000;
 /** Rounds allowed to fail back to back before the watches are given up on. One
     dropped round must not end every generation in flight. */
 const MAX_MISSES = 4;
@@ -28,6 +31,7 @@ export class WatchError extends Error {
 
 type Waiter = {
   deadline: number;
+  onUpdate?: (status: GenerationStatus) => void;
   resolve: (status: GenerationStatus) => void;
   reject: (reason: WatchError) => void;
 };
@@ -61,12 +65,16 @@ export function createPoller(deps: PollerDeps) {
      studio unmounted must not deliver into the next mount's watches. */
   let generation = 0;
 
-  function watch(requestId: string, opts: { deadline: number }): Promise<GenerationStatus> {
+  function watch(
+    requestId: string,
+    opts: { deadline: number; onUpdate?: (status: GenerationStatus) => void },
+  ): Promise<GenerationStatus> {
     const existing = inflight.get(requestId);
     if (existing) return existing;
     const promise = new Promise<GenerationStatus>((resolve, reject) => {
       waiting.set(requestId, {
         deadline: opts.deadline,
+        onUpdate: opts.onUpdate,
         resolve: (status) => {
           inflight.delete(requestId);
           resolve(status);
@@ -82,6 +90,14 @@ export function createPoller(deps: PollerDeps) {
     });
     inflight.set(requestId, promise);
     return promise;
+  }
+
+  /** Stops watching one request (the visitor canceled it). */
+  function unwatch(requestId: string): void {
+    const waiter = waiting.get(requestId);
+    if (!waiter) return;
+    waiting.delete(requestId);
+    waiter.reject(new WatchError("Canceled.", "canceled"));
   }
 
   /** Settles every watch as canceled: the studio unmounted and there is nobody
@@ -145,7 +161,14 @@ export function createPoller(deps: PollerDeps) {
       waiter.reject(new WatchError(result.error, (result.code as ErrorCode) ?? "unknown"));
       return;
     }
-    if (!TERMINAL_STATUSES.has(result.status.status)) return;
+    if (!TERMINAL_STATUSES.has(result.status.status)) {
+      try {
+        waiter.onUpdate?.(result.status);
+      } catch {
+        /* a progress listener must not break polling */
+      }
+      return;
+    }
     waiting.delete(result.requestId);
     waiter.resolve(result.status);
   }
@@ -170,7 +193,7 @@ export function createPoller(deps: PollerDeps) {
     for (const waiter of waiters) waiter.reject(reason);
   }
 
-  return { watch, stop, size: () => waiting.size };
+  return { watch, unwatch, stop, size: () => waiting.size };
 }
 
 export type Poller = ReturnType<typeof createPoller>;

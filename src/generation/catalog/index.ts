@@ -1,6 +1,7 @@
 import { dop } from "./dop";
 import { flux2 } from "./flux-2";
 import { demoArt, freeFlux, freeTurbo, localStableDiffusion } from "./free";
+import { WANGP_MODELS } from "./wangp";
 import { flux3 } from "./flux-3";
 import { grokImagine2 } from "./grok-imagine-2";
 import { grokImagineVideo15 } from "./grok-imagine-video-1.5";
@@ -42,6 +43,7 @@ export const MODELS: readonly ModelEntry[] = [
   freeTurbo,
   localStableDiffusion,
   demoArt,
+  ...WANGP_MODELS,
   soul2,
   soulCinema,
   seedance25,
@@ -96,5 +98,21 @@ export function getModel(id: string): ModelEntry {
   return model;
 }
 
-export type { GenerationPlane, MediaItem, MediaRole, ModelEntry, PlatformPaths, ProviderId, Surface } from "./types";
+export type { GenerationPlane, MediaItem, MediaRole, ModelEntry, PlatformPaths, ProviderId, ReferenceTag, Surface } from "./types";
+export { REFERENCE_TAGS } from "./types";
 export { InvalidSettingError, parseSettings };
+
+/** Whether a press needs words. Image-to-video animates a start frame on its
+    own, motion transfer and extension take their direction from the source
+    clip, and swap presets carry their own instruction. */
+export function promptRequired(
+  model: ModelEntry,
+  media: Partial<Record<string, unknown[]>>,
+  settings: Record<string, unknown>,
+): boolean {
+  const has = (role: string) => (media[role]?.length ?? 0) > 0;
+  if (model.id === "wangp-swap") return settings.preset === "custom";
+  if (model.id === "wangp-motion" || model.id === "wangp-extend") return false;
+  if (model.surface === "video" && model.roles.start && has("start")) return false;
+  return true;
+}

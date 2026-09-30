@@ -1,5 +1,6 @@
 import type { GenerationPlane } from "../catalog/types";
 import { GenerationError } from "../errors";
+import { withReferenceNotes } from "./references";
 import { urls, type Mapped } from "./types";
 
 /** Seedance (ByteDance) request mapping, for 2.0 / 2.0 Fast / 2.0 Mini / 2.5
@@ -85,6 +86,7 @@ export function mapSeedance(plane: GenerationPlane, prefix: string): Mapped {
       path: `${prefix}/reference-to-video`,
       body: {
         ...shared,
+        prompt: withReferenceNotes(plane.prompt.text, plane),
         ...aspect,
         ...(refs.length ? { image_urls: refs } : {}),
         ...(videos.length ? { video_urls: videos } : {}),

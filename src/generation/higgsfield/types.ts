@@ -11,6 +11,10 @@ export type GenerationStatus = {
   requestId: string;
   images?: Array<{ url: string }>;
   video?: { url: string };
+  /** 0–100 while running, when the provider reports it. */
+  progress?: number;
+  /** Short label of the current stage ("Denoising", "Decoding"…). */
+  phase?: string;
   /** Provider's own failure text, already trimmed. */
   error?: string;
 };

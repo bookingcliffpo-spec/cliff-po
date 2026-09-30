@@ -1,6 +1,8 @@
 import { toPlatform } from "./adapters";
 import { findModel, providerOf } from "./catalog";
 import { generateFree, isFreeRequestId, statusFromFreeId } from "./free/providers";
+import { cancelWanGP, isWanGPRequestId, statusWanGP, submitWanGP } from "./free/wangp-client";
+import { normalizeStatus } from "./higgsfield/client";
 import { readProviderConfig, readServerApiKey } from "./config";
 import { GenerationError, MESSAGES, toFailure } from "./errors";
 import { createHiggsfieldClient, type Logger } from "./higgsfield/client";
@@ -67,6 +69,10 @@ export async function submitPlane(
     const env = deps.env ?? process.env;
     const plane = validatePlane(data, { allowPrivateMedia: env.ALLOW_PRIVATE_MEDIA_URLS === "true" });
     const provider = providerOf(findModel(plane.model)!);
+    if (provider === "wangp") {
+      const requestId = await submitWanGP(plane, { env, fetch: deps.fetch });
+      return ok({ requestId, status: "queued" });
+    }
     if (provider !== "higgsfield") {
       const result = await generateFree(plane, provider, { env, fetch: deps.fetch });
       return ok({ requestId: result.requestId, status: result.status, result });
@@ -105,7 +111,7 @@ export async function pollStatuses(
     const requestIds = parseRequestIds(data);
     /* Keyless runs answer from their id; only Higgsfield ids need the key,
        so a studio with no key can still resume its free runs. */
-    const hosted = requestIds.filter((id) => !isFreeRequestId(id));
+    const hosted = requestIds.filter((id) => !isFreeRequestId(id) && !isWanGPRequestId(id));
     const client = hosted.length ? clientFor(deps).client : null;
     const secrets = secretsOf(deps);
     /* Next dispatches server actions one at a time per client, so a poll per
@@ -120,6 +126,10 @@ export async function pollStatuses(
             : { requestId, error: "This run's result could not be recovered.", code: "not_found", final: true };
         }
         try {
+          if (isWanGPRequestId(requestId)) {
+            const status = await statusWanGP(requestId, { env, fetch: deps.fetch });
+            return { requestId, status: { ...status, status: normalizeStatus(status.status) } };
+          }
           return { requestId, status: await client!.status(requestId) };
         } catch (caught) {
           if (caught instanceof GenerationError && caught.status === 404) {
@@ -138,6 +148,29 @@ export async function pollStatuses(
     return ok(results);
   } catch (caught) {
     logUnexpected(deps, "status", caught);
+    return toFailure(caught, secretsOf(deps));
+  }
+}
+
+/** Stops a queued or running request. Keyless runs finish inside the submit,
+    so there is nothing to stop for them. */
+export async function cancelRequest(data: unknown, deps: ServiceDeps = {}): Promise<ActionResult<null>> {
+  try {
+    const requestId =
+      data !== null && typeof data === "object" ? (data as { requestId?: unknown }).requestId : undefined;
+    if (typeof requestId !== "string" || !requestId || requestId.length > 4000) {
+      throw new GenerationError("invalid_request", "Invalid request id.");
+    }
+    const env = deps.env ?? process.env;
+    if (isFreeRequestId(requestId)) return ok(null);
+    if (isWanGPRequestId(requestId)) {
+      await cancelWanGP(requestId, { env, fetch: deps.fetch });
+      return ok(null);
+    }
+    await clientFor(deps).client.cancel(requestId);
+    return ok(null);
+  } catch (caught) {
+    logUnexpected(deps, "cancel", caught);
     return toFailure(caught, secretsOf(deps));
   }
 }
