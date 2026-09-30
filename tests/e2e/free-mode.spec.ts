@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function open(page: Page) {
-  await page.goto("/");
+  await page.goto("/studio");
   await expect(page.locator(".ohf-key")).toContainText("Free mode");
 }
 
@@ -172,6 +172,7 @@ test("promptless restyle preset on an uploaded clip", async ({ page }) => {
   );
   const last = await bridgeLast();
   expect(last.settings).toMatchObject({ model_type: "kiwi_edit_instruct_only", video_prompt_type: "UV" });
-  /* The bridge downloaded the upload from the studio's public media route. */
-  expect(String(last.settings.video_guide)).toMatch(/input1\.mp4$/);
+  /* With WanGP connected and no storage set up, the upload went straight to
+     the bridge, which uses it from its own folder. */
+  expect(String(last.settings.video_guide)).toMatch(/up_[0-9a-f]{32}\.mp4$/);
 });

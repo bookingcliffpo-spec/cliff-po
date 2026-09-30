@@ -28,7 +28,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function openStudio(page: Page) {
-  await page.goto("/");
+  await page.goto("/studio");
   await expect(page.getByRole("button", { name: /server's HF_API_KEY/ })).toBeVisible();
 }
 

@@ -15,6 +15,36 @@ reuse/retry, download, delete + undo — is kept as upstream built it.
 
 ---
 
+## The simple way to use it
+
+The home page is just: **upload images or a video → type a prompt → pick
+model, duration and aspect ratio → Generate.** Results land below and stay in
+your browser. Everything else (start/end frame, motion transfer, character /
+object swap, restyle, audio reference, image roles, cinematic looks, quality)
+is folded under **More settings**. The full studio is at `/studio`.
+
+**Free video, on your computer** — the model runs on your PC and your phone
+uses it over Wi-Fi:
+
+1. Install [WanGP](https://github.com/deepbeepmeep/Wan2GP) on a PC with an
+   NVIDIA GPU and generate once in its own UI to check it works.
+2. From this project:
+   - Windows (PowerShell): `$env:WANGP_ROOT = "C:\WanGP"; .\scripts\start-free-studio.ps1`
+   - macOS / Linux: `WANGP_ROOT=/path/to/Wan2GP ./scripts/start-free-studio.sh`
+   (set `WANGP_PYTHON` to WanGP's own Python if it uses a separate environment)
+3. Open the address it prints — `http://localhost:3000` on the PC, or the
+   `http://192.168.x.x:3000` one on your phone (same Wi-Fi).
+
+Uploads go straight to your PC — no cloud storage account needed. The PC has
+to be on while you generate. Want it on your phone away from home? Add a free
+tunnel (`cloudflared tunnel --url http://localhost:3000`) and set
+`APP_PASSWORD` so strangers cannot use your GPU.
+
+Without a GPU, the hosted site still offers free images, and Seedance video
+if you add a Higgsfield key (paid credits).
+
+---
+
 ## Free mode — no API key
 
 Run it with nothing configured and the studio opens in **Free mode** (the

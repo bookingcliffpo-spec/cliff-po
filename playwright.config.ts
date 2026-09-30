@@ -79,8 +79,6 @@ export default defineConfig({
         APP_PASSWORD: "",
         LOCAL_SD_URL: `http://127.0.0.1:${MOCK_PORT}`,
         LOCAL_UPLOAD_DIR: ".uploads-e2e",
-        STORAGE_DRIVER: "local",
-        PUBLIC_BASE_URL: `http://127.0.0.1:${FREE_PORT}`,
         WANGP_URL: `http://127.0.0.1:${BRIDGE_PORT}`,
         WANGP_TOKEN: BRIDGE_TOKEN,
       },
