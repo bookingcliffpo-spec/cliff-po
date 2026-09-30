@@ -42,7 +42,7 @@ export function readStorageConfig(env: Env = process.env): StorageConfig | null 
     } catch {
       throw new GenerationError("missing_config", "PUBLIC_BASE_URL is not a valid http(s) URL.");
     }
-    const dir = path.resolve(/*turbopackIgnore: true*/ process.cwd(), env.LOCAL_UPLOAD_DIR?.trim() || ".uploads");
+    const dir = localMediaDir(env);
     return { driver: "local", dir, publicBaseUrl };
   }
 
@@ -83,4 +83,10 @@ export function requireStorage(env: Env = process.env): StorageConfig {
     );
   }
   return config;
+}
+
+/** The directory /api/media serves from: local uploads, and images made by a
+    local Stable Diffusion server. */
+export function localMediaDir(env: Env = process.env): string {
+  return path.resolve(/*turbopackIgnore: true*/ process.cwd(), env.LOCAL_UPLOAD_DIR?.trim() || ".uploads");
 }

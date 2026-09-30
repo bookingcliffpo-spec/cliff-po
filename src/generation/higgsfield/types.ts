@@ -1,6 +1,9 @@
 export type QueuedGeneration = {
   status: string;
   requestId: string;
+  /** Set when the run finished inside the submit call (the keyless
+      providers), so the studio can show it without polling. */
+  result?: GenerationStatus;
 };
 
 export type GenerationStatus = {

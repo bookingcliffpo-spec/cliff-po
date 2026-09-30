@@ -1,5 +1,6 @@
 import { dop } from "./dop";
 import { flux2 } from "./flux-2";
+import { demoArt, freeFlux, freeTurbo, localStableDiffusion } from "./free";
 import { flux3 } from "./flux-3";
 import { grokImagine2 } from "./grok-imagine-2";
 import { grokImagineVideo15 } from "./grok-imagine-video-1.5";
@@ -29,7 +30,7 @@ import { recraft41 } from "./recraft-4.1";
 import { seedance2, seedance2Fast, seedance2Mini } from "./seedance-2";
 import { seedance25, seedance25Edit, seedance25Extend } from "./seedance-2.5";
 import { soul2, soulCinema } from "./soul";
-import type { ModelEntry } from "./types";
+import type { ModelEntry, ProviderId } from "./types";
 import { wan26 } from "./wan-2.6";
 import { wan27 } from "./wan-2.7";
 import { wan3 } from "./wan-3";
@@ -37,6 +38,10 @@ import { wan3Prime } from "./wan-3-prime";
 import { zImageTurbo } from "./z-image-turbo";
 
 export const MODELS: readonly ModelEntry[] = [
+  freeFlux,
+  freeTurbo,
+  localStableDiffusion,
+  demoArt,
   soul2,
   soulCinema,
   seedance25,
@@ -77,6 +82,10 @@ export const MODELS: readonly ModelEntry[] = [
   dop,
 ];
 
+export function providerOf(model: ModelEntry): ProviderId {
+  return model.provider ?? "higgsfield";
+}
+
 export function findModel(id: unknown): ModelEntry | undefined {
   return typeof id === "string" ? MODELS.find((entry) => entry.id === id) : undefined;
 }
@@ -87,5 +96,5 @@ export function getModel(id: string): ModelEntry {
   return model;
 }
 
-export type { GenerationPlane, MediaItem, MediaRole, ModelEntry, PlatformPaths, Surface } from "./types";
+export type { GenerationPlane, MediaItem, MediaRole, ModelEntry, PlatformPaths, ProviderId, Surface } from "./types";
 export { InvalidSettingError, parseSettings };

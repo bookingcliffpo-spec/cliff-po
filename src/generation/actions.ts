@@ -2,6 +2,8 @@
 
 import { cookies } from "next/headers";
 
+import type { ProviderId } from "./catalog/types";
+import { availableProviders } from "./free/providers";
 import { hasValidServerApiKey, isProviderConfigured, readServerApiKey } from "./config";
 import {
   PLATFORM_KEY_COOKIE,
@@ -29,6 +31,9 @@ export type StudioStatus = {
   /** HF_API_KEY is set but malformed. */
   serverKeyInvalid: boolean;
   storage: StorageDriver | null;
+  /** Providers a request can go to: "higgsfield" when HF_API_BASE_URL is set,
+      plus the keyless ones enabled on this server. */
+  providers: ProviderId[];
 };
 
 export async function getStudioStatus(): Promise<ActionResult<StudioStatus>> {
@@ -46,6 +51,7 @@ export async function getStudioStatus(): Promise<ActionResult<StudioStatus>> {
       providerConfigured: isProviderConfigured(),
       serverKeyInvalid,
       storage: storageDriver(),
+      providers: availableProviders(),
     });
   } catch (caught) {
     return toFailure(caught);

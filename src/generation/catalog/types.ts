@@ -19,8 +19,13 @@ export type PlatformPaths = {
   reference?: string;
 };
 
+/** Who runs a model. Everything except "higgsfield" works without an API key. */
+export type ProviderId = "higgsfield" | "pollinations" | "local-sd" | "demo";
+
 export type ModelEntry = {
   id: string;
+  /** Defaults to "higgsfield". */
+  provider?: ProviderId;
   surface: Surface;
   label: string;
   roles: Partial<Record<MediaRole, number>>;

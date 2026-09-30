@@ -1,4 +1,6 @@
 import { toPlatform } from "./adapters";
+import { findModel, providerOf } from "./catalog";
+import { generateFree, isFreeRequestId, statusFromFreeId } from "./free/providers";
 import { readProviderConfig, readServerApiKey } from "./config";
 import { GenerationError, MESSAGES, toFailure } from "./errors";
 import { createHiggsfieldClient, type Logger } from "./higgsfield/client";
@@ -64,6 +66,11 @@ export async function submitPlane(
   try {
     const env = deps.env ?? process.env;
     const plane = validatePlane(data, { allowPrivateMedia: env.ALLOW_PRIVATE_MEDIA_URLS === "true" });
+    const provider = providerOf(findModel(plane.model)!);
+    if (provider !== "higgsfield") {
+      const result = await generateFree(plane, provider, { env, fetch: deps.fetch });
+      return ok({ requestId: result.requestId, status: result.status, result });
+    }
     const { path, body } = toPlatform(plane);
     const { client } = clientFor(deps);
     return ok(await client.submit(path, body));
@@ -94,16 +101,26 @@ export async function pollStatuses(
   deps: ServiceDeps = {},
 ): Promise<ActionResult<StatusResult[]>> {
   try {
+    const env = deps.env ?? process.env;
     const requestIds = parseRequestIds(data);
-    const { client } = clientFor(deps);
+    /* Keyless runs answer from their id; only Higgsfield ids need the key,
+       so a studio with no key can still resume its free runs. */
+    const hosted = requestIds.filter((id) => !isFreeRequestId(id));
+    const client = hosted.length ? clientFor(deps).client : null;
     const secrets = secretsOf(deps);
     /* Next dispatches server actions one at a time per client, so a poll per
        run would queue ahead of the next submit — the fan-out belongs on this
        side of the call, where it is genuinely parallel. */
     const results = await Promise.all(
       requestIds.map(async (requestId): Promise<StatusResult> => {
+        if (isFreeRequestId(requestId)) {
+          const status = statusFromFreeId(requestId, env);
+          return status
+            ? { requestId, status }
+            : { requestId, error: "This run's result could not be recovered.", code: "not_found", final: true };
+        }
         try {
-          return { requestId, status: await client.status(requestId) };
+          return { requestId, status: await client!.status(requestId) };
         } catch (caught) {
           if (caught instanceof GenerationError && caught.status === 404) {
             return {
@@ -138,7 +155,9 @@ function parseRequestIds(data: unknown): string[] {
   }
   const unique = new Set<string>();
   for (const requestId of requestIds) {
-    if (typeof requestId !== "string" || !requestId || requestId.length > 200) {
+    /* Keyless ids carry their result URL, so they may be long. */
+    const max = typeof requestId === "string" && isFreeRequestId(requestId) ? 4000 : 200;
+    if (typeof requestId !== "string" || !requestId || requestId.length > max) {
       throw new GenerationError("invalid_request", "Invalid request id.");
     }
     unique.add(requestId);
