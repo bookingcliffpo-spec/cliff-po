@@ -5,6 +5,8 @@ import { defineConfig, devices } from "@playwright/test";
 const APP_PORT = 3100;
 const MOCK_PORT = 4010;
 export const FREE_PORT = 3200;
+export const BRIDGE_PORT = 7871;
+const BRIDGE_TOKEN = "e2e-bridge-token";
 const API_KEY = "e2e_id:e2e_secret_value_123456";
 export const E2E_PASSWORD = "e2e-password";
 
@@ -59,6 +61,13 @@ export default defineConfig({
       },
     },
     {
+      /* WanGP bridge in fake mode: the real bridge code, no GPU. Each job
+         takes ~6s so a run can be watched and canceled. */
+      command: `python3 bridge/wangp_bridge.py --fake --port ${BRIDGE_PORT} --token ${BRIDGE_TOKEN} --output-dir .bridge-e2e --fake-steps 24 --fake-step-seconds 0.25`,
+      url: `http://127.0.0.1:${BRIDGE_PORT}/v1/health`,
+      reuseExistingServer: false,
+    },
+    {
       /* The same build with no provider configured at all: free mode. */
       command: `pnpm start -p ${FREE_PORT}`,
       url: `http://127.0.0.1:${FREE_PORT}/api/health`,
@@ -70,6 +79,10 @@ export default defineConfig({
         APP_PASSWORD: "",
         LOCAL_SD_URL: `http://127.0.0.1:${MOCK_PORT}`,
         LOCAL_UPLOAD_DIR: ".uploads-e2e",
+        STORAGE_DRIVER: "local",
+        PUBLIC_BASE_URL: `http://127.0.0.1:${FREE_PORT}`,
+        WANGP_URL: `http://127.0.0.1:${BRIDGE_PORT}`,
+        WANGP_TOKEN: BRIDGE_TOKEN,
       },
     },
   ],
