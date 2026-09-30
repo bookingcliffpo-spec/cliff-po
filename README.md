@@ -1,164 +1,216 @@
-# OpenHiggsfield AI — Open-Source Alternative to Higgsfield AI
+# OpenHiggsfield Studio — personal fork
 
-> **The free, open-source alternative to Higgsfield AI.** Generate images and
-> videos with 38 models from one prompt bar — no closed ecosystem, no studio
-> subscription.
+A self-hosted image and video generation studio: one prompt bar, 38 models,
+each model's own settings, and every finished run in one gallery. This is a
+personal fork of [wide-trace/open-higgsfield](https://github.com/wide-trace/open-higgsfield)
+(imported at `b16a0ef`) with the reliability and security fixes described
+below. The UX — the dark studio, Image / Video / Assets / Favorites, the
+composer, model picker, per-model settings, batch, gallery, viewer,
+reuse/retry, download, delete + undo — is kept as upstream built it.
 
-## 🌐 Try it Online — No Install Required
+> **Cost.** The studio code costs nothing to run and adds no paid SaaS. Generation
+> itself is **not** free: every run is billed by the generation provider to the
+> API key in use. Storage is either Vercel Blob (has a free tier, paid beyond it)
+> or your own server's disk (free).
 
-**Hosted version:** [openhiggsfield.ai](https://openhiggsfield.ai)
-
-Image and Video in one studio, in the browser — no Node.js, no setup. Add your
-platform key (`id:secret`) to start generating. The studio itself is free.
-
----
-
-**Why OpenHiggsfield AI instead of Higgsfield AI?**
-
-- **Free & open-source** — no studio subscription, no vendor lock-in
-- **Self-hosted** — clone it, run it, change it
-- **Your key** — generate with your own platform key
-- **38 models** — 8 image, 30 video, one catalog, one composer
+Next.js 16 App Router · React 19 · plain CSS · Zustand · pnpm
 
 ---
 
-Next.js 16 App Router on Vercel · React 19 · plain CSS · Zustand · pnpm
+## What this fork changes
+
+| Problem upstream | Fix |
+| --- | --- |
+| **"Minified React error"** instead of the real reason a run failed. Server actions threw, and production React replaces a thrown error's message with an opaque digest. | Every server action returns `ActionResult<T>` — `{ ok: true, data } \| { ok: false, error, status?, code? }`. Provider failures are converted **on the server** into safe messages (Invalid API key, Insufficient provider balance, Missing HF_API_BASE_URL, Invalid model, Unsupported settings, Upload failed, Provider timeout, Rate limited). Nothing depends on `Error.message` crossing the boundary. |
+| Key only ever came from a browser cookie. | `HF_API_KEY` server secret (preferred), with the browser key as a fallback. The key is never sent to the browser or logged. |
+| Anyone with the URL could spend the key. | `APP_PASSWORD` puts the studio behind HTTP Basic auth. |
+| Request/response bodies logged in full. | Logs carry method, path, status and duration only; errors are redacted of anything credential-shaped. |
+| Undefined env vars failed opaquely. | `HF_API_BASE_URL`, `HF_API_KEY` and storage variables are validated and reported **by name**. |
+| No timeouts, no retry policy. | Provider client with per-call timeouts, `AbortSignal`, safe JSON/text parsing, 401/402/403/404/422/429/5xx mapping, and retries only where safe (status polls on transient errors; submits only on 429 so a run is never double-billed). |
+| Hydration mismatch: persisted stores read `localStorage` during the first render. | Stores hydrate after mount. |
+| Stale polling / jobs stuck "running" forever. | Poller with per-surface deadlines (image 10 min, video 25 min), final-vs-transient errors, a fatal-round path for key/config errors, and cancel-on-unmount. |
+| Duplicate records / races. | Rows keyed by the submitted request id; a request's rows replace rather than stack; a double-click or held ⌘/Ctrl+Enter is not a second paid run; history has one writer; undo of a running tile re-attaches its watch. |
+| A stale saved setting crashed the composer during render. | Lenient settings parsing in the UI, strict on the server. |
+| Uploads had no size limits or progress; errors were bare 500s. | Shared type/size allow-list checked in the browser, by the Blob token, and by the server; progress ring; JSON errors; a free **local-disk** storage driver. |
+| Mobile dialogs could overflow the screen under the keyboard; iOS zoomed into inputs. | Dialogs cap at the viewport, scroll inside, lock the page; 16px inputs on small screens. |
+| No tests, no lint. | ESLint, 112 unit/integration tests, a Playwright e2e suite against a mocked provider on the production build, and CI. |
 
 ---
 
-## Features
+## Quick start (local)
 
-### Generate
+Requirements: Node.js 22+, pnpm 10+.
 
-- **One composer for Image and Video.** A single prompt bar drives both; the
-  model you pick decides image or video. `⌘/Ctrl + Enter` submits.
-- **38 models in the catalog** — 8 image, 30 video: Soul 2, Soul Cinema, Seedance
-  2.5 (Edit / Extend), Seedance 2.0 (Fast / Mini), Kling 3 (Turbo / Std / Pro / 4K / Motion), Wan, Flux,
-  Ideogram, Recraft, LTX, MiniMax, PixVerse, Grok, Qwen and more. Searchable
-  picker.
-- **Per-model settings.** Aspect ratio, resolution, duration, output format,
-  audio, batch size, prompt enhancement — each model declares its own allow-list
-  and the studio renders exactly that. No parallel hardcoded list.
-- **Media inputs by role.** Start frame, end frame, references, video and audio,
-  each with the per-role cap the model declares. Files upload to Vercel Blob and
-  become public URLs the generate request can carry.
-- **Asset picker.** Attach from your uploads library or from any finished run in
-  history — two tabs over one library, filtered to the role's kind.
-- **Batch.** Up to 4 results per press. Models with a native count setting use it;
-  the rest are submitted once per result, each clearing its own tile.
-- **Live run lifecycle.** Skeletons open in the grid on submit, the request is
-  polled every 4s until a terminal status (10-minute deadline), and each finished
-  result blooms into place on its own clock.
+```bash
+pnpm install
+cp .env.example .env.local     # then edit .env.local — it is gitignored
+pnpm dev                       # http://localhost:3000
+```
 
-### Gallery
+Minimum `.env.local` to generate from the prompt alone:
 
-- **Four scopes** — Image, Video, Assets (every finished run) and Favorites —
-  as an arrow-key-navigable tab rail.
-- **Masonry grid** of real runs at their true aspect ratio, newest first, with a
-  gradient placeholder while media loads.
-- **Per-tile actions**: reuse, favorite, delete, select.
-- **Reuse restores model, settings and prompt**, so the same run can be
-  re-rendered, not just re-typed.
-- **Viewer.** Full-size media with prompt (copy in one click), model, resolved
-  settings, timestamp, download, favorite and Recreate.
-- **Selection mode.** Click a tile's checkbox to enter; shift-click extends a
-  range. Bulk download (sequential, with progress and a report of any files the
-  CDN refused), bulk favorite/unfavorite, bulk delete. `Esc` exits.
-- **Undo.** Deletion is reversible for 6 seconds via a bar with a draining
-  hairline, in the strip the composer already reserves.
-- **Empty states** that hand you a starter prompt instead of a blank grid.
+```bash
+HF_API_BASE_URL=https://<generation-api-origin>
+HF_API_KEY=<id>:<secret>
+```
 
-### State and errors
+To attach images/video/audio you also need storage (see below). Check the
+configuration at any time:
 
-- **History persists** in IndexedDB in this browser (60 records). Favorites are
-  a deliberate keep and never age out of the cap. Result URLs belong to the
-  generation platform, so old history can outlive its CDN lifetime and show gaps.
-- **Failed, NSFW and canceled runs** are recorded as failed tiles carrying the
-  reason and a retry that restores the prompt and model.
-- **Your own platform key.** Entered in a modal, stored by a server action in an
-  httpOnly cookie. A missing key opens the modal — it never fails silently. The
-  topbar lamp states whether a key is held and whether a run is in flight.
+```bash
+curl -s localhost:3000/api/health
+# {"providerConfigured":true,"storageConfigured":false}
+```
+
+`/api/health` only ever returns these two booleans — never a value.
+
+---
+
+## Environment
+
+All variables are server-only. None is exposed to the browser.
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `HF_API_BASE_URL` | yes | Generation API origin. Submit: `POST {base}/{model-path}`; status: `GET {base}/requests/{id}/status`. |
+| `HF_API_KEY` | recommended | Server key, `id:secret`, sent as `Authorization: Key <id:secret>`. Wins over a key saved in the browser. Leave empty to let each visitor paste their own key. |
+| `APP_PASSWORD` | when public | HTTP Basic auth for the whole studio (any username). **Set this whenever `HF_API_KEY` is set on a reachable deployment.** `/api/media/*` and `/api/health` stay public. |
+| `OPEN_HIGGSFIELD_READ_WRITE_TOKEN` or `BLOB_READ_WRITE_TOKEN` | for uploads (Blob) | Vercel Blob read-write token. |
+| `STORAGE_DRIVER` | optional | `vercel-blob` or `local`. Unset: Blob when its token is present. |
+| `PUBLIC_BASE_URL` | for `local` | Public origin the provider fetches uploads from, e.g. `https://studio.example.com`. |
+| `LOCAL_UPLOAD_DIR` | optional | Directory for `local` uploads (default `.uploads`). |
+| `ALLOW_PRIVATE_MEDIA_URLS` | dev only | `true` allows localhost/private media URLs (for a mock provider). The real provider cannot fetch them. |
+| `NEXT_PUBLIC_SITE_URL` | optional | Canonical origin for metadata. |
+
+### Storage
+
+Providers fetch inputs from the public internet, so uploads must become
+publicly reachable URLs — `blob:` previews are never sent.
+
+- **Vercel Blob** — browser uploads directly to Blob with a token the server
+  scopes to one content type and that type's size cap. Works on serverless.
+- **Local disk** (`STORAGE_DRIVER=local`) — the browser sends the file to
+  `/api/upload`, the server streams it to `LOCAL_UPLOAD_DIR` under a random
+  128-bit name and serves it from `/api/media/<name>`. Free; needs a long-lived
+  server with a persistent disk and a public `PUBLIC_BASE_URL`. **Not for
+  Vercel/serverless** (the filesystem there is ephemeral).
+
+Accepted inputs: JPEG/PNG/WebP/GIF images up to 20 MB, MP4 video up to
+200 MB, WAV audio up to 30 MB.
+
+---
+
+## Deployment
+
+### Vercel
+
+1. Import the repository in Vercel (framework: Next.js; install `pnpm install`,
+   build `pnpm build`).
+2. Create a Blob store (Storage → Blob) and connect it to the project; that sets
+   `BLOB_READ_WRITE_TOKEN`.
+3. Add environment variables (Production and Preview): `HF_API_BASE_URL`,
+   `HF_API_KEY`, `APP_PASSWORD`.
+4. Deploy, then open `https://<deployment>/api/health` — both values should be
+   `true`.
+
+Every server call is short — a submit waits at most 60 s for the provider,
+a status poll at most 20 s — and long video runs are polled from the browser,
+so no function needs an extended timeout.
+
+### Self-hosted (any Node 22 host)
+
+```bash
+pnpm install --frozen-lockfile
+pnpm build
+HF_API_BASE_URL=... HF_API_KEY=... APP_PASSWORD=... \
+STORAGE_DRIVER=local PUBLIC_BASE_URL=https://studio.example.com \
+pnpm start -p 3000
+```
+
+Run it under a process manager (systemd, pm2) behind a TLS reverse proxy
+(Caddy, nginx) that forwards to port 3000. Keep `LOCAL_UPLOAD_DIR` on a
+persistent volume and back it up if you care about old inputs. Put secrets in
+the process manager's environment file with restrictive permissions, not in
+the repository.
+
+---
+
+## Commands
+
+| Command | What it does |
+| --- | --- |
+| `pnpm dev` | Dev server on port 3000 |
+| `pnpm build` / `pnpm start` | Production build / serve it |
+| `pnpm typecheck` | `tsc --noEmit` |
+| `pnpm lint` | ESLint (Next core-web-vitals + TypeScript) |
+| `pnpm test` | Unit and integration tests (Vitest) |
+| `pnpm test:e2e` | Builds for production and runs the Playwright smoke test against a mock provider (no real key needed) |
+| `pnpm check` | typecheck + lint + test + build |
+| `pnpm brand` | Rebuild icons and the OG card in `public/` |
+
+---
+
+## Troubleshooting
+
+| You see | Cause and fix |
+| --- | --- |
+| `Missing HF_API_BASE_URL — set the generation API origin on the server.` | The variable is unset in the server environment. Set it and restart / redeploy. |
+| `HF_API_BASE_URL is not a valid http(s) URL.` | Include the scheme, e.g. `https://…`; no username/password in the URL. |
+| `HF_API_KEY is malformed — it must be id:secret.` | The value has no colon, an empty half, or whitespace inside. |
+| `No API key configured…` / key modal opens | Neither `HF_API_KEY` nor a browser key is set. |
+| `Invalid API key — the provider rejected the credential.` | 401 (or 403 naming the key) from the provider. Check the key is current and complete. |
+| `Access denied — this API key is not allowed…` | 403: the key works but lacks access to that model. |
+| `Insufficient provider balance…` | 402 or a credits/balance error: top up with the provider. |
+| `Rate limited by the provider…` | 429 after the client's own retry. Wait and retry; lower the batch size. |
+| `Unsupported settings — …` | The provider (or the catalog check before it) rejected a setting or input combination; the detail names it — e.g. Seedance takes a start/end frame *or* references, not both. |
+| `Invalid model — …` | Unknown model id or a provider path that does not exist (404). |
+| `Provider timeout — …` | No response within the call timeout, or a run that did not finish within its deadline (image 10 min, video 25 min). It may still complete in the provider dashboard. |
+| `Upload failed — … is not supported` / `… can be up to …` | Wrong type or too large; see accepted inputs above. |
+| `Upload failed — Vercel Blob is not configured…` | Set a Blob token or `STORAGE_DRIVER=local` + `PUBLIC_BASE_URL`. `/api/health` shows `storageConfigured`. |
+| `Upload failed — an input is hosted on a private address…` | `PUBLIC_BASE_URL` points at localhost/LAN; the provider cannot fetch it. Use a public origin (or a tunnel) — or `ALLOW_PRIVATE_MEDIA_URLS=true` only with a mock provider. |
+| Browser asks for a username/password | `APP_PASSWORD` is set: any username, that password. |
+| Old runs show blank tiles | Result URLs belong to the provider's CDN and can expire; history is kept per browser in IndexedDB. |
+
+Server logs never contain the key, the Authorization header, or request bodies;
+look for `[higgsfield] POST /… 402 812ms`-style lines.
 
 ---
 
 ## Architecture
 
-Each generate is one object: `{ model, prompt, media, settings }`.
-
-- **The UI builds that object** and hands it to a server action. The action
-  resolves it against the catalog and maps it to the generation API's own
-  fields (`image_urls`, `aspect_ratio`, …).
-- **Server actions are the only caller.** The browser never talks to the
-  generation API. Submit is `POST /{model}`; status is
-  `GET /requests/{id}/status`. Auth is `Authorization: Key <api_key>`.
-- **The catalog is the source of truth** (`src/generation/catalog/`). A new entry
-  appears in the picker, brings its own settings rail and media roles, and needs
-  no studio changes.
-- **Five small Zustand stores** — shared image/video prompt, shared image/video
-  media, `settings[modelId]`, and a tiny `active` store. No store per model.
-- **Uploads** go client-direct to Vercel Blob through `/api/blob`, which issues
-  scoped tokens. `blob:` URLs are preview-only.
-
----
-
-## Getting started
-
-```bash
-pnpm install
-pnpm dev            # http://localhost:3000
-```
-
-Open the studio, press **Add key**, and paste your platform key as `id:secret`.
-
-### Environment
-
-```bash
-HF_API_BASE_URL=                      # generation API origin, server only
-OPEN_HIGGSFIELD_READ_WRITE_TOKEN=     # Vercel Blob read-write token
-```
-
-### Commands
-
-| Command | What it does |
-| --- | --- |
-| `pnpm dev` | Dev server on port 3000 |
-| `pnpm build` | Production build |
-| `pnpm start` | Serve the production build |
-| `pnpm brand` | Rebuild the icons and OG card in `public/` |
-
----
-
-## Layout
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). In one paragraph: the UI
+builds one plane `{ model, prompt, media, settings }` and hands it to the
+`submitGeneration` server action; the server re-validates it against the
+catalog, maps it to the provider's fields in `src/generation/adapters/`, and
+submits it through `src/generation/higgsfield/client.ts`. The browser polls
+every run in flight with one batched `getGenerationStatuses` action every 4 s
+until a terminal status or the deadline. Every action returns an
+`ActionResult`; nothing is thrown across the boundary.
 
 ```
 src/
-  app/          /  is the full-viewport studio and the only page
-                /api/blob issues upload tokens
-                base.css owns the document canvas
-  generation/   generate requests, server actions, API mapping, catalog, stores
-  openhiggsfield/
-                the studio surface: composer, gallery, viewer, model picker,
-                settings, asset picker, selection bar — and openhiggsfield.css
+  app/                 the studio page, /api/blob, /api/upload, /api/media/[name], /api/health
+  proxy.ts             APP_PASSWORD gate + device cookie
+  generation/
+    actions.ts         server actions (all return ActionResult)
+    service.ts         submit/poll logic, testable without Next
+    higgsfield/        provider client, error mapping, response types
+    adapters/          model → provider request mapping (seedance.ts, …)
+    catalog/           model entries: settings, media roles, paths
+    storage/           storage config + local-disk driver
+    poll.ts            batched client-side poller
+  openhiggsfield/      the studio UI and openhiggsfield.css
+tests/unit             Vitest
+tests/e2e              Playwright + mock provider
+legacy/harlem-empire   an unrelated prototype that previously lived at the repo root
 ```
 
 ---
 
-## Design principles
+## License
 
-Dark studio ground, a single lime accent `#d1fe17`, Inter throughout. The chrome
-stays neutral so the generated work is the only color on the surface.
-
-1. **The tool disappears into the task** — expression never obscures state or
-   affordance.
-2. **Accent is state, not decoration** — selection, primary action, liveness only.
-3. **Data is data** — settings, counts and durations read in tabular numerals.
-   One typeface throughout; no monospace anywhere.
-4. **Motion conveys state** — the generation lifecycle, the arrival of a run.
-   Nothing loops decoratively.
-5. **Every control ships all its states** — hover, focus, active, disabled,
-   loading, error, empty.
-6. **The catalog is the source of truth** — the studio renders what the model
-   declares, never a parallel hardcoded list.
-
-Built for people who work in long sessions, iterating on prompts, inputs and
-settings.
+The upstream repository ships **no license file**, which means its code is
+all-rights-reserved by default even though it is publicly visible. This fork is
+kept as a personal copy; see [`NOTICE.md`](NOTICE.md) before redistributing or
+publishing it. All dependencies added by this fork (ESLint, Vitest,
+Playwright, server-only) are MIT or Apache-2.0.
