@@ -1,22 +1,22 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 
-import { OpenHiggsfieldApp } from "@/openhiggsfield/openhiggsfield-app";
+import { SimpleStudio } from "@/simple/simple-studio";
 
-import "@/openhiggsfield/openhiggsfield.css";
+import "@/simple/simple.css";
 
 const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-ohf-inter",
+  variable: "--font-sp-inter",
   display: "swap",
 });
 
-/* Title, description and the Open Graph block all come from the root, which
-   already describes this surface. Only the canonical link is route-specific. */
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
 
-export default function OpenHiggsfieldPage() {
-  return <OpenHiggsfieldApp fontClassName={inter.variable} />;
+/** Upload → prompt → Generate. Everything else lives under "More settings",
+    and the full studio is at /studio. */
+export default function HomePage() {
+  return <SimpleStudio fontClassName={inter.variable} />;
 }
