@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 
 import { useActive } from "./active";
+import { useDirection } from "./direction";
 import { useImageMedia, useVideoMedia } from "./media";
 import { useImagePrompt, useVideoPrompt } from "./prompt";
 import { useSettings } from "./settings";
 
-const STORES = [useActive, useImageMedia, useVideoMedia, useImagePrompt, useVideoPrompt, useSettings];
+const STORES = [useActive, useImageMedia, useVideoMedia, useImagePrompt, useVideoPrompt, useSettings, useDirection];
 
 /** Reads the persisted studio state after the first client render. Every store
     is created with skipHydration, so server HTML and the hydrating client both

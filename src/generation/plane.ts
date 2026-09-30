@@ -4,6 +4,15 @@ import { DEFAULT_MODEL, useActive } from "./stores/active";
 import { useImageMedia, useVideoMedia } from "./stores/media";
 import { useImagePrompt, useVideoPrompt } from "./stores/prompt";
 import { useSettings } from "./stores/settings";
+import { buildCinematicPrompt, hasDirection, type Direction } from "./cinema";
+import { useDirection } from "./stores/direction";
+
+/** The Director's notes in force for the next video press, or null. */
+export function activeDirection(): Direction | null {
+  const { surface } = useActive.getState();
+  const { enabled, direction } = useDirection.getState();
+  return surface === "video" && enabled && hasDirection(direction) ? direction : null;
+}
 
 export function assemblePlane(): GenerationPlane {
   const { model: modelId, surface } = useActive.getState();
@@ -24,7 +33,8 @@ export function assemblePlane(): GenerationPlane {
   }
   return {
     model: model.id,
-    prompt: { text },
+    /* The visitor's words plus the Director's notes, for video. */
+    prompt: { text: buildCinematicPrompt(text, activeDirection()) },
     media,
     settings: parseSettings(model, useSettings.getState().byModel[model.id] ?? {}, "lenient"),
   };
