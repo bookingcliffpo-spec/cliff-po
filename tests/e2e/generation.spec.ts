@@ -32,6 +32,12 @@ async function openStudio(page: Page) {
   await expect(page.getByRole("button", { name: /server's HF_API_KEY/ })).toBeVisible();
 }
 
+async function pickModel(page: Page, label: string) {
+  await page.locator(".ohf-ctl--model").click();
+  await page.locator(".ohf-model-row", { hasText: label }).first().click();
+  await expect(page.locator(".ohf-ctl--model")).toContainText(label);
+}
+
 async function prompt(page: Page, text: string) {
   const box = page.getByRole("textbox", { name: "Prompt" });
   await box.fill(text);
@@ -60,6 +66,7 @@ test("image generation: submit, poll, and the result lands in the gallery", asyn
 
   await openStudio(page);
   await page.getByRole("tab", { name: "Image" }).click();
+  await pickModel(page, "Soul 2");
   await prompt(page, "a lighthouse at dusk, e2e");
 
   const tile = page.locator(".ohf-tile:not(.ohf-tile--failed) img.ohf-tile-media");
@@ -83,6 +90,7 @@ test("image generation: submit, poll, and the result lands in the gallery", asyn
 test("provider failures show the real, safe message — not a masked React error", async ({ page }) => {
   await openStudio(page);
   await page.getByRole("tab", { name: "Image" }).click();
+  await pickModel(page, "Soul 2");
   await prompt(page, "NO_CREDITS please");
 
   const alert = page.locator(".ohf-alert");

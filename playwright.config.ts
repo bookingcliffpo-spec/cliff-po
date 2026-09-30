@@ -4,6 +4,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const APP_PORT = 3100;
 const MOCK_PORT = 4010;
+export const FREE_PORT = 3200;
 const API_KEY = "e2e_id:e2e_secret_value_123456";
 export const E2E_PASSWORD = "e2e-password";
 
@@ -55,6 +56,20 @@ export default defineConfig({
         PUBLIC_BASE_URL: `http://127.0.0.1:${APP_PORT}`,
         LOCAL_UPLOAD_DIR: ".uploads-e2e",
         ALLOW_PRIVATE_MEDIA_URLS: "true",
+      },
+    },
+    {
+      /* The same build with no provider configured at all: free mode. */
+      command: `pnpm start -p ${FREE_PORT}`,
+      url: `http://127.0.0.1:${FREE_PORT}/api/health`,
+      timeout: 120_000,
+      reuseExistingServer: false,
+      env: {
+        HF_API_BASE_URL: "",
+        HF_API_KEY: "",
+        APP_PASSWORD: "",
+        LOCAL_SD_URL: `http://127.0.0.1:${MOCK_PORT}`,
+        LOCAL_UPLOAD_DIR: ".uploads-e2e",
       },
     },
   ],

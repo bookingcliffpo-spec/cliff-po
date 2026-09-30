@@ -58,6 +58,13 @@ const server = http.createServer(async (req, res) => {
   }
 
   const body = req.method === "POST" ? await readBody(req) : null;
+
+  // AUTOMATIC1111-compatible local Stable Diffusion API (no key).
+  if (req.method === "POST" && url.pathname === "/sdapi/v1/txt2img") {
+    calls.push({ method: "POST", path: url.pathname, authorized: true, body, media: {} });
+    return send(res, 200, { images: [PNG.toString("base64")] });
+  }
+
   const authorized = req.headers.authorization === EXPECTED_AUTH;
   const call = { method: req.method, path: url.pathname, authorized, body, media: {} };
   calls.push(call);
