@@ -3,12 +3,23 @@ node_modules
 .next
 out
 dist
+coverage
 *.local
-.env
-.env.*
-!.env.example
-.vercel
 tsconfig.tsbuildinfo
-
-.env*
+.vercel
 .idea
+
+# Secrets: every .env file except the placeholder template.
+.env
+.env*
+!.env.example
+*.pem
+*.key
+
+# Local upload storage (STORAGE_DRIVER=local)
+.uploads
+
+# Test output
+playwright-report
+test-results
+blob-report
