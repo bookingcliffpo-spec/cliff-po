@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a0a0b">
+<title>Cinematic Prompt Studio</title>
+<meta name="description" content="Build cinematic video prompts with a Director's Panel — genre, era, camera, lens, moves, color and light — and sketch free storyboard keyframes. Works in any browser, no key.">
+<style>
+  :root {
+    --bg: #0a0a0b; --s1: #151719; --s2: #1b1e20; --s3: #222629;
+    --line: rgba(255,255,255,.06); --line-2: rgba(255,255,255,.1);
+    --tx: #eef0f0; --tx2: #a8aeaf; --tx3: #878e90;
+    --accent: #d1fe17; --accent-ink: #141a02; --danger: #ff6b5e;
+    --r: 14px; --ease: cubic-bezier(.2,0,0,1);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--tx); }
+  body { font: 14px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+  button, select, input, textarea { font: inherit; color: inherit; }
+  a { color: var(--accent); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 64px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .mark { width: 28px; height: 28px; border-radius: 8px; background: var(--accent); display: grid; place-items: center; color: var(--accent-ink); font-weight: 800; }
+  h1 { font-size: 17px; font-weight: 650; letter-spacing: -.02em; margin: 0; }
+  .sub { color: var(--tx3); font-size: 12.5px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--s1); color: var(--tx2); font-size: 12.5px; text-decoration: none; }
+  .pill:hover { color: var(--tx); border-color: rgba(255,255,255,.2); }
+  .grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .card { background: var(--s2); border: 1px solid var(--line-2); border-radius: 18px; padding: 16px; }
+  .card h2 { font-size: 13.5px; font-weight: 620; margin: 0 0 2px; letter-spacing: -.01em; }
+  .card .hint { color: var(--tx3); font-size: 12px; margin: 0 0 12px; }
+  label.f { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .lbl { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--tx3); }
+  textarea { width: 100%; min-height: 96px; resize: vertical; padding: 12px 13px; border-radius: 12px; background: var(--s1); border: 1px solid var(--line-2); outline: none; font-size: 15px; line-height: 1.5; }
+  textarea:focus, select:focus-visible, input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; }
+  select { width: 100%; height: 34px; padding: 0 8px; border-radius: 9px; background: var(--s1); border: 1px solid var(--line-2); font-size: 13px; }
+  .color { display: flex; align-items: center; gap: 8px; height: 34px; }
+  input[type=color] { width: 42px; height: 30px; padding: 0; border: 1px solid var(--line-2); border-radius: 8px; background: none; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .btn { height: 34px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--s3); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btn:hover:not(:disabled) { border-color: rgba(255,255,255,.22); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .btn.primary:hover:not(:disabled) { filter: brightness(1.05); }
+  .btn.quiet { background: none; color: var(--tx2); }
+  .looks { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .look { height: 30px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--s1); color: var(--tx2); font-size: 12.5px; cursor: pointer; }
+  .look:hover, .look[aria-pressed=true] { color: var(--accent-ink); background: var(--accent); border-color: transparent; }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--tx2); font-size: 12.5px; cursor: pointer; }
+  .toggle input { accent-color: var(--accent); }
+  .out { white-space: pre-wrap; word-break: break-word; background: var(--s1); border: 1px solid var(--line); border-radius: 12px; padding: 12px 13px; min-height: 120px; font-size: 13.5px; line-height: 1.55; color: var(--tx); }
+  .out .notes { color: var(--tx2); }
+  .meta { display: flex; justify-content: space-between; gap: 8px; color: var(--tx3); font-size: 11.5px; margin: 6px 2px 12px; }
+  .sticky { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 16px; }
+  .frames { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+  .frame { position: relative; border-radius: 12px; overflow: hidden; background: linear-gradient(135deg, #1a1d1f, #0f1112); border: 1px solid var(--line); aspect-ratio: 16 / 9; display: grid; place-items: center; color: var(--tx3); font-size: 12px; }
+  .frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .5s var(--ease); }
+  .frame img.on { opacity: 1; }
+  .frame .n { position: absolute; left: 8px; top: 8px; z-index: 1; font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 6px; background: rgba(9,13,12,.72); color: var(--tx); }
+  .spin { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--line-2); border-top-color: var(--accent); animation: r .7s linear infinite; }
+  @keyframes r { to { transform: rotate(360deg); } }
+  .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%) translateY(20px); opacity: 0; background: var(--s3); border: 1px solid var(--line-2); padding: 8px 14px; border-radius: 10px; font-size: 13px; transition: .25s var(--ease); pointer-events: none; }
+  .toast.on { opacity: 1; transform: translateX(-50%); }
+  .history { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow: auto; }
+  .hist { text-align: left; padding: 8px 10px; border-radius: 10px; background: var(--s1); border: 1px solid var(--line); color: var(--tx2); font-size: 12.5px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hist:hover { color: var(--tx); border-color: var(--line-2); }
+  footer { margin-top: 28px; color: var(--tx3); font-size: 12px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .sticky { position: static; } }
+  @media (max-width: 560px) {
+    .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    select, textarea { font-size: 16px; }
+    .frames { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="mark" aria-hidden="true">▶</div>
+      <div>
+        <h1>Cinematic Prompt Studio</h1>
+        <div class="sub">Director's Panel · free · no key · works offline</div>
+      </div>
+    </div>
+    <div class="row">
+      <a class="pill" id="studioLink" href="https://openhiggsfield-studio.vercel.app" target="_blank" rel="noopener">Open the full studio ↗</a>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section class="card" aria-labelledby="dirTitle">
+      <label class="f" style="margin-bottom:14px">
+        <span class="lbl">Your shot</span>
+        <textarea id="prompt" placeholder="Describe the shot — who, where, what happens. e.g. a detective crosses a rain-soaked bridge at night"></textarea>
+      </label>
+
+      <h2 id="dirTitle">Director's Panel</h2>
+      <p class="hint">Pick only what matters — anything left on "Any" adds nothing.</p>
+
+      <div class="looks" id="looks" aria-label="Quick looks"></div>
+      <div class="fields" id="fields"></div>
+
+      <div class="row" style="justify-content:space-between;margin-top:14px">
+        <label class="toggle"><input type="checkbox" id="apply" checked> Apply to prompt</label>
+        <div class="row">
+          <button class="btn quiet" id="random" type="button">Surprise me</button>
+          <button class="btn quiet" id="reset" type="button">Reset all</button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="sticky">
+      <section class="card" aria-labelledby="outTitle">
+        <h2 id="outTitle">Cinematic prompt</h2>
+        <p class="hint">Paste into any video model — Seedance, WanGP/LTX, Kling, Veo, Runway…</p>
+        <div class="out" id="out" aria-live="polite"></div>
+        <div class="meta"><span id="count">0 characters</span><span id="choices">0 choices</span></div>
+        <div class="row">
+          <button class="btn primary" id="copy" type="button">Copy prompt</button>
+          <button class="btn" id="saveBtn" type="button">Save</button>
+          <button class="btn" id="exportBtn" type="button">Export .txt</button>
+          <button class="btn" id="jsonBtn" type="button">Export settings</button>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="sbTitle">
+        <h2 id="sbTitle">Storyboard keyframes</h2>
+        <p class="hint">Free AI stills of your shot via Pollinations (no key; rate-limited, needs internet). Use them as start/end frames.</p>
+        <div class="row">
+          <select id="sbAspect" aria-label="Keyframe aspect ratio" style="width:auto">
+            <option value="16:9">16:9</option><option value="9:16">9:16</option><option value="1:1">1:1</option><option value="21:9">21:9</option><option value="4:3">4:3</option>
+          </select>
+          <button class="btn primary" id="sbGo" type="button">Sketch 4 frames</button>
+        </div>
+        <div class="frames" id="frames"></div>
+      </section>
+
+      <section class="card" aria-labelledby="hTitle">
+        <h2 id="hTitle">Saved prompts</h2>
+        <p class="hint">Stored in this browser only.</p>
+        <div class="history" id="history"></div>
+      </section>
+    </aside>
+  </div>
+
+  <footer>
+    Part of the OpenHiggsfield studio fork. Prompts never leave your browser unless you sketch keyframes (sent to Pollinations) or copy them yourself.
+  </footer>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+"use strict";
+/* Option lists are generated from src/generation/cinema.ts, so this page and
+   the studio's Director's Panel always say the same thing. */
+const DATA = __DATA__;
+
+const PICKS = [
+  ["genre", "Genre", DATA.GENRES], ["era", "Era", DATA.ERAS], ["tempo", "Tempo", DATA.TEMPOS],
+  ["camera", "Camera", DATA.CAMERAS], ["lens", "Lens", DATA.LENSES], ["aperture", "Aperture", DATA.APERTURES],
+  ["move", "Camera move", DATA.MOVES], ["palette", "Color palette (" + DATA.PALETTES.length + ")", DATA.PALETTES],
+  ["lighting", "Lighting preset", DATA.LIGHTING], ["lightAngle", "Lighting angle", DATA.LIGHT_ANGLES],
+];
+const LEVELS = [
+  ["brightness", "Brightness", "Neutral", [[-2, "Very dark"], [-1, "Dim"], [1, "Bright"], [2, "Very bright"]]],
+  ["diffusion", "Diffusion", "Any", [[10, "Hard light"], [45, "Soft light"], [80, "Heavy diffusion"]]],
+  ["emotion", "Emotion strength", "Any", [[15, "Subtle"], [45, "Natural"], [75, "Strong"], [95, "Intense"]]],
+];
+const LOOKS = {
+  "Noir detective": { genre: "noir", era: "1970s", camera: "35mm", lens: "anamorphic", move: "push-in", palette: "noir-bw", lighting: "low-key", lightAngle: "side" },
+  "Epic aerial": { genre: "epic", camera: "imax", lens: "24mm", move: "helicopter", palette: "golden", lighting: "golden-hour", emotion: 75 },
+  "80s VHS": { era: "1980s", camera: "vhs", palette: "synthwave", lighting: "neon-night", tempo: "dynamic" },
+  "Home movie": { camera: "8mm", era: "1960s", palette: "vintage-fade", move: "handheld", lighting: "daylight" },
+  "Y2K camcorder": { camera: "dv", era: "2000s", move: "handheld", tempo: "frenetic", palette: "music-video" },
+  "Horror": { genre: "horror", move: "dolly-zoom", palette: "horror-green", lighting: "low-key", lightAngle: "under", brightness: -2 },
+  "Action": { genre: "action", move: "robot-arm", tempo: "frenetic", lens: "14mm", palette: "teal-orange", emotion: 95 },
+  "Product hero": { genre: "general", lens: "macro", aperture: "f2.8", move: "orbit", lighting: "high-key", palette: "luxury", diffusion: 45 },
+  "Dreamy romance": { genre: "drama", lens: "85mm", aperture: "f1.4", palette: "dreamy-haze", lighting: "golden-hour", lightAngle: "back", diffusion: 80 },
+  "POV thriller": { move: "pov", camera: "phone", tempo: "single", lighting: "neon-night", emotion: 75 },
+};
+
+const $ = (id) => document.getElementById(id);
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+
+let state = Object.assign({ prompt: "", apply: true, direction: {} }, store.get("cps.state", {}));
+
+/* ---------- the same compiler as the studio ---------- */
+const phraseOf = (list, id) => id ? (list.find((o) => o.id === id) || {}).phrase : undefined;
+const BRIGHTNESS = ["very dark exposure", "dim exposure", "", "bright exposure", "very bright, airy exposure"];
+function colorName(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || "").trim()); if (!m) return;
+  const n = parseInt(m[1], 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  if (max - min < 24) return max > 200 ? "white" : max < 60 ? "dim neutral" : "neutral";
+  const d = max - min; let h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; if (h < 0) h += 360;
+  return [[15, "red"], [40, "orange"], [65, "amber"], [90, "yellow-green"], [160, "green"], [200, "cyan"], [250, "blue"], [290, "violet"], [335, "magenta"], [360, "red"]].find(([l]) => h <= l)[1];
+}
+function hasDirection(d) {
+  return Object.entries(d || {}).some(([k, v]) => v !== undefined && v !== "" && v !== null && !(k === "brightness" && v === 0));
+}
+function directionText(d) {
+  if (!hasDirection(d)) return "";
+  const parts = [];
+  const style = [phraseOf(DATA.GENRES, d.genre), phraseOf(DATA.ERAS, d.era)].filter(Boolean).join(", ");
+  if (style) parts.push(`Style: ${style}.`);
+  const tempo = phraseOf(DATA.TEMPOS, d.tempo); if (tempo) parts.push(`Editing: ${tempo}.`);
+  const optics = [phraseOf(DATA.CAMERAS, d.camera), phraseOf(DATA.LENSES, d.lens), phraseOf(DATA.APERTURES, d.aperture)].filter(Boolean).join(", ");
+  if (optics) parts.push(`Camera: ${optics}.`);
+  const move = phraseOf(DATA.MOVES, d.move); if (move) parts.push(`Camera movement: ${move}.`);
+  const palette = phraseOf(DATA.PALETTES, d.palette); if (palette) parts.push(`Color: ${palette}.`);
+  const light = [];
+  const preset = phraseOf(DATA.LIGHTING, d.lighting); if (preset) light.push(preset);
+  const color = d.lightColor ? colorName(d.lightColor) : undefined;
+  const angle = phraseOf(DATA.LIGHT_ANGLES, d.lightAngle);
+  if (color || angle) light.push([color ? `${color}-tinted` : "", angle || "light"].filter(Boolean).join(" "));
+  if (typeof d.brightness === "number" && d.brightness !== 0) light.push(BRIGHTNESS[Math.max(-2, Math.min(2, Math.round(d.brightness))) + 2]);
+  if (typeof d.diffusion === "number") light.push(d.diffusion < 25 ? "hard crisp shadows" : d.diffusion < 60 ? "softly diffused light" : "heavily diffused, glowing soft light");
+  if (light.length) parts.push(`Lighting: ${light.join(", ")}.`);
+  if (typeof d.emotion === "number") parts.push(`Performance: ${d.emotion < 25 ? "restrained, subtle emotion" : d.emotion < 60 ? "natural, readable emotion" : d.emotion < 85 ? "strong, expressive emotion" : "intense, overwhelming emotion"}.`);
+  return parts.join(" ");
+}
+function buildPrompt() {
+  const base = state.prompt.trim();
+  const notes = state.apply ? directionText(state.direction) : "";
+  return { base, notes, full: notes ? (base ? `${base}\n\n${notes}` : notes) : base };
+}
+
+/* ---------- UI ---------- */
+function field(label, control) {
+  const wrap = document.createElement("label"); wrap.className = "f";
+  const span = document.createElement("span"); span.className = "lbl"; span.textContent = label;
+  wrap.append(span, control); return wrap;
+}
+function renderFields() {
+  const host = $("fields"); host.textContent = "";
+  for (const [key, label, list] of PICKS) {
+    const sel = document.createElement("select"); sel.setAttribute("aria-label", label.replace(/ \(\d+\)$/, ""));
+    sel.append(new Option("Any", ""));
+    for (const o of list) sel.append(new Option(o.label, o.id));
+    sel.value = state.direction[key] || "";
+    sel.onchange = () => setDir({ [key]: sel.value || undefined });
+    host.append(field(label, sel));
+  }
+  for (const [key, label, none, steps] of LEVELS) {
+    const sel = document.createElement("select"); sel.setAttribute("aria-label", label);
+    sel.append(new Option(none, ""));
+    for (const [v, l] of steps) sel.append(new Option(l, String(v)));
+    sel.value = state.direction[key] === undefined ? "" : String(state.direction[key]);
+    sel.onchange = () => setDir({ [key]: sel.value === "" ? undefined : Number(sel.value) });
+    host.append(field(label, sel));
+  }
+  const box = document.createElement("span"); box.className = "color";
+  const input = document.createElement("input"); input.type = "color"; input.setAttribute("aria-label", "Custom lighting color");
+  input.value = state.direction.lightColor || "#ffd9a8";
+  input.oninput = () => setDir({ lightColor: input.value });
+  const clear = document.createElement("button"); clear.type = "button"; clear.className = "btn quiet"; clear.style.height = "30px";
+  clear.textContent = state.direction.lightColor ? "Clear" : "Off"; clear.disabled = !state.direction.lightColor;
+  clear.onclick = () => setDir({ lightColor: undefined });
+  box.append(input, clear);
+  host.append(field("Light color", box));
+}
+function renderLooks() {
+  const host = $("looks"); host.textContent = "";
+  for (const [name, look] of Object.entries(LOOKS)) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "look"; b.textContent = name;
+    b.setAttribute("aria-pressed", String(JSON.stringify(look) === JSON.stringify(state.direction)));
+    b.onclick = () => { state.direction = { ...look }; save(); renderFields(); renderLooks(); render(); };
+    host.append(b);
+  }
+}
+function render() {
+  const { base, notes, full } = buildPrompt();
+  const out = $("out"); out.textContent = "";
+  if (!full) { out.innerHTML = '<span class="notes">Write your shot and pick a few Director choices — the finished prompt appears here.</span>'; }
+  else {
+    if (base) out.append(document.createTextNode(base + (notes ? "\n\n" : "")));
+    if (notes) { const s = document.createElement("span"); s.className = "notes"; s.textContent = notes; out.append(s); }
+  }
+  $("count").textContent = `${full.length} characters`;
+  const n = Object.values(state.direction).filter((v) => v !== undefined && v !== "" && v !== 0).length;
+  $("choices").textContent = `${n} choice${n === 1 ? "" : "s"}`;
+  $("copy").disabled = !full; $("saveBtn").disabled = !full; $("exportBtn").disabled = !full;
+  $("sbGo").disabled = !full;
+}
+function setDir(patch) {
+  state.direction = { ...state.direction, ...patch };
+  for (const k of Object.keys(state.direction)) if (state.direction[k] === undefined) delete state.direction[k];
+  save(); renderFields(); renderLooks(); render();
+}
+function save() { store.set("cps.state", state); }
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("on"), 1800); }
+function download(name, text, type) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: name }); document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+/* ---------- saved prompts ---------- */
+function renderHistory() {
+  const list = store.get("cps.saved", []); const host = $("history"); host.textContent = "";
+  if (!list.length) { host.innerHTML = '<span class="sub">Nothing saved yet.</span>'; return; }
+  for (const item of list) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "hist";
+    b.textContent = item.prompt || "(no words — Director only)"; b.title = "Load this prompt and its Director settings";
+    b.onclick = () => { state.prompt = item.prompt; state.direction = { ...item.direction }; $("prompt").value = state.prompt; save(); renderFields(); renderLooks(); render(); toast("Loaded"); };
+    host.append(b);
+  }
+}
+
+/* ---------- storyboard ---------- */
+const SIZES = { "16:9": [1280, 720], "9:16": [720, 1280], "1:1": [1024, 1024], "21:9": [1344, 576], "4:3": [1152, 864] };
+const BEATS = ["establishing wide shot", "medium shot", "close-up", "final moment"];
+function sketch() {
+  const { full } = buildPrompt(); if (!full) return;
+  const [w, h] = SIZES[$("sbAspect").value] || SIZES["16:9"];
+  const host = $("frames"); host.textContent = "";
+  BEATS.forEach((beat, i) => {
+    const box = document.createElement("div"); box.className = "frame"; box.style.aspectRatio = `${w} / ${h}`;
+    const n = document.createElement("span"); n.className = "n"; n.textContent = `${i + 1} · ${beat}`;
+    const spin = document.createElement("span"); spin.className = "spin"; spin.setAttribute("aria-hidden", "true");
+    const img = new Image(); img.alt = `Keyframe ${i + 1}: ${beat}`; img.loading = "lazy"; img.referrerPolicy = "no-referrer";
+    const seed = Math.floor(Math.random() * 2e9);
+    const text = `${full}\n\nStoryboard frame: ${beat}. Cinematic still, film frame.`.slice(0, 1500);
+    img.src = `https://image.pollinations.ai/prompt/${encodeURIComponent(text)}?width=${w}&height=${h}&seed=${seed}&model=flux&nologo=true&private=true`;
+    img.onload = () => { img.classList.add("on"); spin.remove(); };
+    img.onerror = () => { spin.remove(); box.append(Object.assign(document.createElement("span"), { textContent: "Busy or offline — try again" })); };
+    const open = document.createElement("a"); open.href = img.src; open.target = "_blank"; open.rel = "noopener"; open.style.position = "absolute"; open.style.inset = "0"; open.setAttribute("aria-label", `Open keyframe ${i + 1} full size`);
+    box.append(img, n, spin, open); host.append(box);
+  });
+}
+
+/* ---------- wiring ---------- */
+$("prompt").value = state.prompt;
+$("apply").checked = state.apply;
+$("prompt").oninput = (e) => { state.prompt = e.target.value; save(); render(); };
+$("apply").onchange = (e) => { state.apply = e.target.checked; save(); render(); };
+$("reset").onclick = () => { state.direction = {}; save(); renderFields(); renderLooks(); render(); };
+$("random").onclick = () => {
+  const pick = (l) => l[Math.floor(Math.random() * l.length)].id;
+  state.direction = { genre: pick(DATA.GENRES), era: pick(DATA.ERAS), camera: pick(DATA.CAMERAS), lens: pick(DATA.LENSES), move: pick(DATA.MOVES), palette: pick(DATA.PALETTES), lighting: pick(DATA.LIGHTING) };
+  save(); renderFields(); renderLooks(); render();
+};
+$("copy").onclick = async () => {
+  const { full } = buildPrompt();
+  try { await navigator.clipboard.writeText(full); toast("Copied"); }
+  catch { const t = $("prompt"); const old = t.value; t.value = full; t.select(); document.execCommand("copy"); t.value = old; toast("Copied"); }
+};
+$("saveBtn").onclick = () => {
+  const list = store.get("cps.saved", []);
+  list.unshift({ prompt: state.prompt.trim(), direction: { ...state.direction }, at: Date.now() });
+  store.set("cps.saved", list.slice(0, 30)); renderHistory(); toast("Saved");
+};
+$("exportBtn").onclick = () => download("cinematic-prompt.txt", buildPrompt().full, "text/plain");
+$("jsonBtn").onclick = () => download("director-settings.json", JSON.stringify({ prompt: state.prompt, direction: state.direction }, null, 2), "application/json");
+$("sbGo").onclick = sketch;
+document.addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") $("copy").click(); });
+
+renderFields(); renderLooks(); render(); renderHistory();
+</script>
+</body>
+</html>

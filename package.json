@@ -14,7 +14,8 @@
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
     "brand": "node scripts/build-brand-assets.mjs",
     "test:bridge": "python3 -m unittest discover -s tests/bridge",
-    "bridge:fake": "python3 bridge/wangp_bridge.py --fake"
+    "bridge:fake": "python3 bridge/wangp_bridge.py --fake",
+    "build:html": "node --experimental-strip-types tools/build-cinematic-html.mjs"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.14.10",
