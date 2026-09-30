@@ -8,10 +8,46 @@ below. The UX — the dark studio, Image / Video / Assets / Favorites, the
 composer, model picker, per-model settings, batch, gallery, viewer,
 reuse/retry, download, delete + undo — is kept as upstream built it.
 
-> **Cost.** The studio code costs nothing to run and adds no paid SaaS. Generation
-> itself is **not** free: every run is billed by the generation provider to the
-> API key in use. Storage is either Vercel Blob (has a free tier, paid beyond it)
-> or your own server's disk (free).
+> **Cost.** The studio runs with **no API key at all** in free mode (below). The
+> 38 Higgsfield models are billed by the provider to the key in use. Storage is
+> either Vercel Blob (has a free tier, paid beyond it) or your own server's disk
+> (free).
+
+---
+
+## Free mode — no API key
+
+Run it with nothing configured and the studio opens in **Free mode** (the
+topbar says so), offering only the models that need no key:
+
+| Model | What it is | Cost / limits |
+| --- | --- | --- |
+| **Flux · Free**, **Turbo · Free** | Real AI images from [Pollinations](https://pollinations.ai), a free public service. The server builds the image URL; your browser loads it. | Free, no signup. Rate-limited and shared; quality and uptime are theirs, not guaranteed. Prompts are sent to Pollinations. |
+| **Stable Diffusion · Local GPU** | Your own [AUTOMATIC1111](https://github.com/AUTOMATIC1111/stable-diffusion-webui) / Forge / SD.Next server started with `--api`. Set `LOCAL_SD_URL`. | Free and unlimited, fully private — needs a capable GPU (≈8 GB VRAM for SDXL). |
+| **Demo · Offline** | Placeholder art drawn by this server, stamped "DEMO · NOT AI". | Free, works with no network. For trying the studio, not for real images. |
+
+Everything else — batch, gallery, favorites, reuse, download, delete + undo,
+history — works the same in free mode.
+
+**What free mode cannot do:** video. There is no free, keyless video
+generation service; video needs `HF_API_KEY` (or a key pasted in the studio).
+Image inputs (start frames, references) are also only used by the paid models.
+
+```bash
+pnpm install
+pnpm build && pnpm start      # http://localhost:3000 — no .env needed
+```
+
+Local Stable Diffusion, on the same machine as a GPU:
+
+```bash
+./webui.sh --api              # AUTOMATIC1111 / Forge, listens on :7860
+LOCAL_SD_URL=http://127.0.0.1:7860 pnpm start
+```
+
+Turn the hosted or demo models off with `FREE_PROVIDERS` (e.g.
+`FREE_PROVIDERS=demo`, or empty for none). Adding `HF_API_BASE_URL` +
+`HF_API_KEY` later unlocks the paid models alongside the free ones.
 
 Next.js 16 App Router · React 19 · plain CSS · Zustand · pnpm
 
@@ -72,8 +108,11 @@ All variables are server-only. None is exposed to the browser.
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `HF_API_BASE_URL` | yes | Generation API origin. Submit: `POST {base}/{model-path}`; status: `GET {base}/requests/{id}/status`. |
-| `HF_API_KEY` | recommended | Server key, `id:secret`, sent as `Authorization: Key <id:secret>`. Wins over a key saved in the browser. Leave empty to let each visitor paste their own key. |
+| `FREE_PROVIDERS` | optional | Keyless providers to offer: `pollinations,demo` by default; empty for none. |
+| `POLLINATIONS_IMAGE_URL` | optional | Pollinations image endpoint (default `https://image.pollinations.ai/prompt/`). |
+| `LOCAL_SD_URL` | optional | AUTOMATIC1111-compatible Stable Diffusion API (started with `--api`). Enables the local GPU model. |
+| `HF_API_BASE_URL` | for paid models | Generation API origin. Submit: `POST {base}/{model-path}`; status: `GET {base}/requests/{id}/status`. |
+| `HF_API_KEY` | for paid models | Server key, `id:secret`, sent as `Authorization: Key <id:secret>`. Wins over a key saved in the browser. Leave empty to let each visitor paste their own key. |
 | `APP_PASSWORD` | when public | HTTP Basic auth for the whole studio (any username). **Set this whenever `HF_API_KEY` is set on a reachable deployment.** `/api/media/*` and `/api/health` stay public. |
 | `OPEN_HIGGSFIELD_READ_WRITE_TOKEN` or `BLOB_READ_WRITE_TOKEN` | for uploads (Blob) | Vercel Blob read-write token. |
 | `STORAGE_DRIVER` | optional | `vercel-blob` or `local`. Unset: Blob when its token is present. |
@@ -157,7 +196,7 @@ the repository.
 | `Missing HF_API_BASE_URL — set the generation API origin on the server.` | The variable is unset in the server environment. Set it and restart / redeploy. |
 | `HF_API_BASE_URL is not a valid http(s) URL.` | Include the scheme, e.g. `https://…`; no username/password in the URL. |
 | `HF_API_KEY is malformed — it must be id:secret.` | The value has no colon, an empty half, or whitespace inside. |
-| `No API key configured…` / key modal opens | Neither `HF_API_KEY` nor a browser key is set. |
+| `No API key configured…` / key modal opens | Neither `HF_API_KEY` nor a browser key is set and free mode is off. |
 | `Invalid API key — the provider rejected the credential.` | 401 (or 403 naming the key) from the provider. Check the key is current and complete. |
 | `Access denied — this API key is not allowed…` | 403: the key works but lacks access to that model. |
 | `Insufficient provider balance…` | 402 or a credits/balance error: top up with the provider. |
@@ -168,6 +207,10 @@ the repository.
 | `Upload failed — … is not supported` / `… can be up to …` | Wrong type or too large; see accepted inputs above. |
 | `Upload failed — Vercel Blob is not configured…` | Set a Blob token or `STORAGE_DRIVER=local` + `PUBLIC_BASE_URL`. `/api/health` shows `storageConfigured`. |
 | `Upload failed — an input is hosted on a private address…` | `PUBLIC_BASE_URL` points at localhost/LAN; the provider cannot fetch it. Use a public origin (or a tunnel) — or `ALLOW_PRIVATE_MEDIA_URLS=true` only with a mock provider. |
+| Free Flux/Turbo tiles stay blank or broken | Pollinations is rate-limiting or down, or your network blocks `image.pollinations.ai`. Wait and retry, or use Local GPU / Demo. |
+| `Could not reach the local Stable Diffusion server…` | Start it with `--api` and check `LOCAL_SD_URL` is reachable from the studio server. |
+| `Video needs a provider key…` | Expected in free mode — there is no free video model. |
+| `This model needs an API key…` | You picked a paid model with no key; pick a free one or add a key. |
 | Browser asks for a username/password | `APP_PASSWORD` is set: any username, that password. |
 | Old runs show blank tiles | Result URLs belong to the provider's CDN and can expire; history is kept per browser in IndexedDB. |
 
@@ -195,6 +238,7 @@ src/
     actions.ts         server actions (all return ActionResult)
     service.ts         submit/poll logic, testable without Next
     higgsfield/        provider client, error mapping, response types
+    free/              keyless providers: Pollinations, local Stable Diffusion, demo art
     adapters/          model → provider request mapping (seedance.ts, …)
     catalog/           model entries: settings, media roles, paths
     storage/           storage config + local-disk driver

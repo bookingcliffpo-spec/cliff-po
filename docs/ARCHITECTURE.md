@@ -28,6 +28,30 @@ service.pollStatuses ── GET {base}/requests/{id}/status (parallel)
 terminal status ▸ rows replaced by completed/failed records ▸ IndexedDB
 ```
 
+## Keyless providers
+
+Each catalog entry has a `provider` (`higgsfield` by default, or
+`pollinations`, `local-sd`, `demo`). `getStudioStatus()` returns the providers
+this server can use, and the studio offers only those models — so with no
+configuration the picker shows just the free ones and no key is asked for.
+
+Keyless runs finish inside the submit action (`free/providers.ts`):
+
+- **pollinations** — the server builds
+  `{POLLINATIONS_IMAGE_URL}{prompt}?width&height&seed&model&nologo&private`
+  and returns it; the browser loads the image. No server-side network call.
+- **local-sd** — `POST {LOCAL_SD_URL}/sdapi/v1/txt2img`; the base64 PNGs are
+  stored in `LOCAL_UPLOAD_DIR` and served from `/api/media`.
+- **demo** — `/api/demo` draws a deterministic SVG (escaped prompt, served
+  with a `default-src 'none'` CSP).
+
+The submit result carries the finished `GenerationStatus`, so no poll is
+needed. The request id encodes the result (`pl_`/`dm_` + base64url URL,
+`sd_` + stored names), so a status poll after a reload answers from the id
+alone — without a key — and ids that decode to URLs the server would not have
+produced are refused. A fresh random seed per press makes a batch of four
+four different images.
+
 ## Error contract
 
 `src/generation/result.ts`
