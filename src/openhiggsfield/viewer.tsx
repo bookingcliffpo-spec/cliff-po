@@ -66,7 +66,8 @@ export function Viewer({
   const after = useRef(onClose);
 
   useEffect(() => {
-    ref.current?.showModal();
+    const dialog = ref.current;
+    if (dialog && !dialog.open) dialog.showModal();
     // Focus the panel itself so no action button opens pre-ringed.
     panelRef.current?.focus();
   }, []);

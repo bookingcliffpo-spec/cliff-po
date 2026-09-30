@@ -15,7 +15,12 @@ function createPromptStore(name: string) {
         text: "",
         setText: (text) => set((state) => (state.text === text ? state : { text })),
       }),
-      { name, storage: browserStorage(), partialize: (state) => ({ text: state.text }) },
+      {
+        name,
+        storage: browserStorage(),
+        skipHydration: true,
+        partialize: (state) => ({ text: state.text }),
+      },
     ),
   );
 }

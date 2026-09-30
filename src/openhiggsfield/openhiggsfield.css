@@ -3734,3 +3734,49 @@ a.ohf-btn-solid {
     display: none;
   }
 }
+
+/* ---------- reliability fixes (fork) ---------- */
+
+/* Upload progress ring inside the attach button. */
+.ohf-upload-progress {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+}
+
+/* A modal must never be taller than the screen it is on: with the on-screen
+   keyboard up, a centered panel with no max-height put its own input and
+   buttons out of reach. The panel scrolls inside the viewport instead. */
+.ohf dialog:not(.ohf-viewer) {
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* The page behind a modal holds still, so a swipe on the backdrop does not
+   scroll the gallery underneath (iOS ignores overscroll-behavior there). */
+html:has(.ohf dialog[open]) {
+  overflow: hidden;
+}
+
+@media (max-width: 560px) {
+  .ohf dialog:not(.ohf-viewer) {
+    width: calc(100vw - 24px);
+    margin: max(12px, env(safe-area-inset-top)) auto auto;
+  }
+  .ohf-keys-panel {
+    width: 100%;
+    max-width: none;
+  }
+  /* iOS zooms the page into any field under 16px and leaves it zoomed. */
+  .ohf-input,
+  .ohf-prompt {
+    font-size: 16px;
+  }
+  .ohf-keys-actions {
+    flex-wrap: wrap;
+  }
+  .ohf-keys-save {
+    flex: 1;
+    height: 40px;
+  }
+}

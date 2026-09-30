@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import { getModel } from "../catalog";
+import { findModel } from "../catalog";
 import type { Surface } from "../catalog/types";
 import { browserStorage } from "./browser-storage";
 
@@ -9,6 +9,8 @@ import { browserStorage } from "./browser-storage";
     their own are submitted once per result — every unit is a real platform
     request — so the ceiling is deliberately small. */
 export const MAX_BATCH = 4;
+
+export const DEFAULT_MODEL = "seedance-2.5";
 
 type ActiveState = {
   surface: Surface;
@@ -22,10 +24,10 @@ export const useActive = create<ActiveState>()(
   persist(
     (set) => ({
       surface: "video",
-      model: "seedance-2.5",
+      model: DEFAULT_MODEL,
       batch: 1,
       setModel: (id) => {
-        const model = getModel(id);
+        const model = findModel(id) ?? findModel(DEFAULT_MODEL)!;
         set((state) =>
           state.model === model.id && state.surface === model.surface
             ? state
@@ -42,13 +44,16 @@ export const useActive = create<ActiveState>()(
       name: "openhiggsfield.active.v2",
       storage: browserStorage(),
       partialize: (state) => ({ surface: state.surface, model: state.model, batch: state.batch }),
+      /* Rehydrated after mount by useHydrateStores, never during the first
+         render — the server rendered the defaults, and reading localStorage
+         while hydrating would make the client's first render disagree. */
+      skipHydration: true,
       onRehydrateStorage: () => (state) => {
         if (!state) return;
-        try {
-          getModel(state.model);
-        } catch {
-          state.setModel("seedance-2.5");
-        }
+        const model = findModel(state.model);
+        if (!model) state.setModel(DEFAULT_MODEL);
+        else if (model.surface !== state.surface) state.setModel(model.id);
+        if (!Number.isInteger(state.batch) || state.batch < 1 || state.batch > MAX_BATCH) state.setBatch(1);
       },
     },
   ),

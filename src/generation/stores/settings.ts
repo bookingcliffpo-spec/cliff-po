@@ -26,6 +26,11 @@ export const useSettings = create<SettingsState>()(
           };
         }),
     }),
-    { name: "openhiggsfield.settings.v1", storage: browserStorage(), partialize: (state) => ({ byModel: state.byModel }) },
+    {
+      name: "openhiggsfield.settings.v1",
+      storage: browserStorage(),
+      skipHydration: true,
+      partialize: (state) => ({ byModel: state.byModel }),
+    },
   ),
 );

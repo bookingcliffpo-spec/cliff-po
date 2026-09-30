@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
 import { parseSettings } from "@/generation/catalog";
 import type { ModelEntry, Surface } from "@/generation/catalog";
+import type { StorageDriver } from "@/generation/storage/config";
 import { MAX_BATCH, useActive } from "@/generation/stores/active";
 import { useImagePrompt, useVideoPrompt } from "@/generation/stores/prompt";
 import { useSettings } from "@/generation/stores/settings";
@@ -45,10 +46,18 @@ function popoverWidth(id: string, model: ModelEntry): number {
   return 268;
 }
 
+/* The modifier is the visitor's, not the server's: the server snapshot is
+   null, so hydration renders no hint and the client fills it in after. */
+const noSubscribe = () => () => {};
+function readShortcut(): string {
+  return /Mac|iP(hone|ad|od)/.test(navigator.userAgent) ? "⌘↵" : "Ctrl↵";
+}
+
 export function Composer({
   surface,
   model,
   generating,
+  storage = null,
   error,
   focusNonce,
   history,
@@ -61,6 +70,8 @@ export function Composer({
   surface: Surface;
   model: ModelEntry;
   generating: boolean;
+  /** Which upload driver the server has configured, or null for none. */
+  storage?: StorageDriver | null;
   error: string | null;
   focusNonce: number;
   /* Finished runs are attachable inputs, so the asset picker reads the same
@@ -83,12 +94,15 @@ export function Composer({
   const videoPrompt = useVideoPrompt();
   const prompt = surface === "image" ? imagePrompt : videoPrompt;
   const settings = useSettings();
-  const values = parseSettings(model, settings.byModel[model.id] ?? {});
-  const tray = useMediaTray(model, onError);
+  const values = parseSettings(model, settings.byModel[model.id] ?? {}, "lenient");
+  const tray = useMediaTray(model, onError, storage);
 
-  const [overlay, setOverlay] = useState<string | null>(null);
+  const [openOverlay, setOverlay] = useState<string | null>(null);
+  /* A panel anchored to a control the visitor can no longer see is a stray
+     plate — the selection toolbar's swap puts whatever was open away. */
+  const overlay = selecting ? null : openOverlay;
   const [anchor, setAnchor] = useState({ x: 0, y: 0 });
-  const [shortcut, setShortcut] = useState<string | null>(null);
+  const shortcut = useSyncExternalStore(noSubscribe, readShortcut, () => null);
   const dockRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const promptRef = useRef<HTMLTextAreaElement>(null);
@@ -168,16 +182,6 @@ export function Composer({
     if (focusNonce > 0) promptRef.current?.focus();
   }, [focusNonce]);
 
-  /* A panel anchored to a control the visitor can no longer see is a stray
-     plate — the swap closes whatever the composer had open. */
-  useEffect(() => {
-    if (selecting) setOverlay(null);
-  }, [selecting]);
-
-  // Rendered only after mount: the modifier is the visitor's, not the server's.
-  useEffect(() => {
-    setShortcut(/Mac|iP(hone|ad|od)/.test(navigator.userAgent) ? "⌘↵" : "Ctrl↵");
-  }, []);
 
   /* Popovers are positioned by the composer so the wide ones stay inside its
      column, but they open off the control that summoned them: the anchor
@@ -254,6 +258,7 @@ export function Composer({
             history={history}
             staged={tray.staged}
             uploading={tray.uploading}
+            progress={tray.progress}
             onUpload={tray.begin}
             onApply={tray.apply}
             onClose={() => setOverlay(null)}
@@ -289,13 +294,17 @@ export function Composer({
                     className="ohf-attach ohf-tip ohf-tip--start"
                     data-tip={attachLabel}
                     disabled={tray.allFull}
-                    aria-label={tray.uploading ? "Uploading" : attachLabel}
+                    aria-label={
+                      tray.uploading
+                        ? `Uploading ${Math.round((tray.progress ?? 0) * 100)}%`
+                        : attachLabel
+                    }
                     aria-expanded={overlay === ASSETS}
                     aria-haspopup="dialog"
                     onClick={(event) => toggle(ASSETS, event.currentTarget)}
                   >
                     {tray.uploading ? (
-                      <span className="ohf-spinner" aria-hidden />
+                      <UploadProgress value={tray.progress ?? 0} />
                     ) : (
                       <PlusIcon size={16} />
                     )}
@@ -321,7 +330,9 @@ export function Composer({
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
                     event.preventDefault();
-                    if (!disabled) onGenerate();
+                    /* A held shortcut auto-repeats; only the first press is a
+                       request for a run. */
+                    if (!disabled && !event.repeat) onGenerate();
                   }
                 }}
               />
@@ -472,5 +483,32 @@ function BatchStepper({
         <PlusIcon size={12} />
       </button>
     </div>
+  );
+}
+
+/* A ring that fills as the file goes up, with the percentage for anyone who
+   cannot read an arc. Indeterminate (the spinner) until the first byte counts. */
+function UploadProgress({ value }: { value: number }) {
+  if (value <= 0) return <span className="ohf-spinner" aria-hidden />;
+  const radius = 7;
+  const circumference = 2 * Math.PI * radius;
+  return (
+    <span className="ohf-upload-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(value * 100)} aria-label="Upload progress">
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
+        <circle cx="9" cy="9" r={radius} fill="none" stroke="var(--line-2)" strokeWidth="1.5" />
+        <circle
+          cx="9"
+          cy="9"
+          r={radius}
+          fill="none"
+          stroke="var(--accent)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - value)}
+          transform="rotate(-90 9 9)"
+        />
+      </svg>
+    </span>
   );
 }

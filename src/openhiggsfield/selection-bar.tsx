@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useState } from "react";
 import type { CSSProperties } from "react";
 
 import type { RunRecord } from "./history";
@@ -38,9 +38,9 @@ export function SelectionBar({
 }) {
   const on = records.length > 0;
   /* The exiting bar keeps saying what it was acting on. */
-  const held = useRef(records);
-  if (on) held.current = records;
-  const shown = held.current;
+  const [held, setHeld] = useState(records);
+  if (on && held !== records) setHeld(records);
+  const shown = on ? records : held;
 
   const count = shown.length;
   const saveable = shown.filter((record) => record.urls[0]).length;

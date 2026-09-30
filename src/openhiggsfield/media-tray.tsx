@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 import type { MediaItem, MediaRole, ModelEntry } from "@/generation/catalog";
+import { ROLE_KIND } from "@/generation/media-rules";
+import type { StorageDriver } from "@/generation/storage/config";
 import { useImageMedia, useVideoMedia } from "@/generation/stores/media";
-import { uploadMedia } from "@/generation/upload";
+import { UploadError, uploadMedia } from "@/generation/upload";
 
 import { ROLE_ACCEPT, ROLE_LABELS, ROLE_TAGS, rolesOf } from "./data";
 import { AudioIcon, CloseIcon, VideoIcon } from "./icons";
@@ -29,6 +31,8 @@ export interface MediaTray {
       whole set and one press applies it. */
   staged: string | null;
   uploading: boolean;
+  /** 0–1 while a file is on its way, null otherwise. */
+  progress: number | null;
   allFull: boolean;
   /** Hidden file input; render it once inside the composer. */
   input: ReactNode;
@@ -42,9 +46,12 @@ export interface MediaTray {
 export function useMediaTray(
   model: ModelEntry,
   onError: (message: string | null) => void,
+  storage: StorageDriver | null,
 ): MediaTray {
   const media = useMedia(model);
-  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
+  const uploading = progress !== null;
+  const abortRef = useRef<AbortController | null>(null);
   const [uploads, setUploads] = useState<UploadRecord[]>([]);
   const [staged, setStaged] = useState<string | null>(null);
   const [uploadsLoaded, setUploadsLoaded] = useState(false);
@@ -80,12 +87,26 @@ export function useMediaTray(
   }
   const allFull = roles.length > 0 && roles.every((role) => counts[role]! >= (model.roles[role] ?? 0));
 
+  /* An upload still running when the composer unmounts is abandoned, not left
+     to write into a component that is gone. */
+  useEffect(() => () => abortRef.current?.abort(), []);
+
   async function onFile(file: File | undefined) {
-    if (!file) return;
+    if (!file || uploading) return;
     onError(null);
-    setUploading(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setProgress(0);
     try {
-      const uploaded = await uploadMedia(file);
+      const uploaded = await uploadMedia(file, {
+        driver: storage,
+        expected: ROLE_KIND[roleRef.current],
+        signal: controller.signal,
+        onProgress: (fraction) => {
+          if (!controller.signal.aborted) setProgress(fraction);
+        },
+      });
+      if (controller.signal.aborted) return;
       /* The file outlives this run: it joins the shelf the picker offers, so a
          reference used once can be reached again without a second upload. */
       setStaged(uploaded.url);
@@ -99,13 +120,15 @@ export function useMediaTray(
         }),
       );
     } catch (caught) {
+      if (controller.signal.aborted) return;
       onError(
-        caught instanceof Error
-          ? `Upload failed — ${caught.message}. Check the Blob store is configured, then retry.`
+        caught instanceof UploadError
+          ? caught.message
           : "Upload failed. Retry, or drop the file and generate from the prompt alone.",
       );
     } finally {
-      setUploading(false);
+      if (abortRef.current === controller) abortRef.current = null;
+      if (!controller.signal.aborted) setProgress(null);
     }
   }
 
@@ -148,7 +171,7 @@ export function useMediaTray(
     }
   }
 
-  return { roles, items: media.items, uploads, staged, uploading, allFull, input, begin, apply };
+  return { roles, items: media.items, uploads, staged, uploading, progress, allFull, input, begin, apply };
 }
 
 /** Attached inputs, above the prompt — the frames read before the words do. */

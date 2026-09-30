@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { hasPlatformCredentials, submitGeneration } from "@/generation/actions";
-import { MissingCredentialsError } from "@/generation/credentials";
-import { MODELS, getModel } from "@/generation/catalog";
+import { getStudioStatus, submitGeneration, type StudioStatus } from "@/generation/actions";
+import { MODELS, findModel, getModel } from "@/generation/catalog";
 import type { Surface } from "@/generation/catalog";
+import type { GenerationStatus } from "@/generation/higgsfield/types";
 import { assemblePlane } from "@/generation/plane";
-import type { GenerationStatus } from "@/generation/platform";
-import { POLL_DEADLINE_MS, stopWatching, watchRequest } from "@/generation/poll";
-import { useActive } from "@/generation/stores/active";
+import { POLL_DEADLINE_MS, WatchError } from "@/generation/poll";
+import { studioPoller } from "@/generation/poller";
+import { callAction, type ActionFailure } from "@/generation/result";
+import { DEFAULT_MODEL, useActive } from "@/generation/stores/active";
+import { useHydrateStores } from "@/generation/stores/hydrate";
 import { useImagePrompt, useVideoPrompt } from "@/generation/stores/prompt";
 import { useSettings } from "@/generation/stores/settings";
 
@@ -26,7 +28,15 @@ import {
   type GalleryView,
 } from "./data";
 import { Gallery } from "./gallery";
-import { loadHistory, mergeHistory, replaceRequest, saveHistory, stepRun, type RunRecord } from "./history";
+import {
+  loadHistory,
+  mergeHistory,
+  replaceRequest,
+  requestIdOf,
+  saveHistory,
+  stepRun,
+  type RunRecord,
+} from "./history";
 import { CloseIcon, UndoIcon } from "./icons";
 import { SelectionBar, type SaveProgress } from "./selection-bar";
 import { Topbar } from "./topbar";
@@ -34,6 +44,9 @@ import { Viewer } from "./viewer";
 
 /* Long enough to read the bar and reach it; the drain line states the window. */
 const UNDO_MS = 6000;
+/* A second press inside this window with the same plane is a double-click or a
+   held shortcut, not a request for another paid run. */
+const DUPLICATE_PRESS_MS = 800;
 
 export interface ActiveRun {
   /** Identifies the skeleton this run occupies, so a batch clears one tile at
@@ -108,7 +121,10 @@ function terminalRows(requestId: string, draft: RunDraft, status: GenerationStat
   const urls =
     status.images?.map((image) => image.url) ?? (status.video ? [status.video.url] : []);
   const completed = status.status === "completed" && urls.length > 0;
-  const base = status.requestId || requestId;
+  /* Rows stay keyed by the id they were opened under. Re-keying from the
+     status payload forked a second copy of the run whenever the provider spelt
+     its id differently. */
+  const base = requestId;
   const failure = completed ? undefined : failureText(status);
   const delivered: Array<string | null> = completed ? urls : [null];
   return delivered.map((url, offset) => {
@@ -143,25 +159,27 @@ function failedRows(requestId: string, count: number, draft: RunDraft, error: st
 }
 
 function failureText(status: GenerationStatus): string {
-  if (status.status === "nsfw") return "the platform flagged the result as NSFW";
-  if (status.status === "canceled") return "the run was canceled";
-  if (typeof status.error === "string" && status.error) return status.error;
-  return "the platform reported a failure";
+  if (status.status === "nsfw") return "The provider flagged the result as NSFW.";
+  if (status.status === "canceled") return "The run was canceled.";
+  if (status.status === "completed") return "The provider finished without returning any media.";
+  if (status.error) return `The provider reported a failure — ${status.error}`;
+  return "The provider reported a failure.";
 }
 
-function describeError(caught: unknown): string {
-  const message = caught instanceof Error ? caught.message : String(caught);
-  if (caught instanceof MissingCredentialsError || message.includes("Missing platform key")) {
-    return "Add your platform key to generate.";
-  }
-  return `Generation failed — ${message}. Try again; if it repeats, check the key in the sidebar.`;
+/** Failures that a key fixes. The modal opens for these — unless the key in
+    use is the server's, which nobody in the browser can change. */
+const KEY_CODES = new Set(["missing_api_key", "invalid_api_key"]);
+
+function planeSignature(plane: ReturnType<typeof assemblePlane>): string {
+  return JSON.stringify([plane.model, plane.prompt.text, plane.settings, plane.media]);
 }
 
 export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: string }) {
   const surface = useActive((state) => state.surface);
   const modelId = useActive((state) => state.model);
   const setModel = useActive((state) => state.setModel);
-  const model = getModel(modelId);
+  const model = findModel(modelId) ?? getModel(DEFAULT_MODEL);
+  const storesReady = useHydrateStores();
   const setSettings = useSettings((state) => state.set);
 
   const [history, setHistory] = useState<RunRecord[]>([]);
@@ -179,8 +197,12 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
      recent sheets on top, and a range extends from the last one touched. */
   const [selected, setSelected] = useState<string[]>([]);
   const [saving, setSaving] = useState<SaveProgress | null>(null);
-  const [keyConfigured, setKeyConfigured] = useState(false);
+  /* null until the server has answered; the studio never guesses "no key"
+     and opens the modal on a visitor who has one. */
+  const [studio, setStudio] = useState<StudioStatus | null>(null);
   const [keysOpen, setKeysOpen] = useState(false);
+  const keyConfigured = studio?.credential != null;
+  const serverKey = studio?.credential === "server";
 
   const galleryRef = useRef<HTMLDivElement>(null);
   const rangeAnchor = useRef<number | null>(null);
@@ -188,16 +210,22 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
   /* Presses number their own skeletons, so two batches in flight together can
      never claim the same tile. */
   const press = useRef(0);
+  const lastPress = useRef<{ at: number; signature: string } | null>(null);
   const alive = useRef(true);
   const freshTimers = useRef<number[]>([]);
   const historyRef = useRef(history);
-  historyRef.current = history;
+  useEffect(() => {
+    historyRef.current = history;
+  }, [history]);
 
   /* The model picker can cross surfaces, so the scope follows it — unless the
-     visitor parked on a scope that spans both. */
-  useEffect(() => {
-    setView((current) => (CROSS_VIEWS.has(current) ? current : surface));
-  }, [surface]);
+     visitor parked on a scope that spans both. Adjusted during render rather
+     than in an effect, so the grid never paints one frame of the old scope. */
+  const [viewSurface, setViewSurface] = useState(surface);
+  if (viewSurface !== surface) {
+    setViewSurface(surface);
+    if (!CROSS_VIEWS.has(view)) setView(surface);
+  }
 
   /* Read once on mount. A load that finishes after unmount must not mark the
      next mount hydrated, or the empty initial list is written over the store. */
@@ -216,24 +244,57 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
       live = false;
     };
   }, []);
+  /* The one writer of the log. Updaters stay pure — saving from inside one ran
+     twice under StrictMode and could land before the stored log was read. */
   useEffect(() => {
     if (historyLoaded) void saveHistory(history);
   }, [historyLoaded, history]);
 
-  useEffect(() => {
-    void hasPlatformCredentials().then((ready) => {
-      setKeyConfigured(ready);
-      if (!ready) setKeysOpen(true);
-    });
+  const refreshStudio = useCallback(async () => {
+    const result = await callAction(getStudioStatus);
+    if (!alive.current) return null;
+    if (!result.ok) {
+      setError(result.error);
+      return null;
+    }
+    setStudio(result.data);
+    return result.data;
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- state is set after the server answers, not synchronously
+    void refreshStudio().then((status) => {
+      if (!status) return;
+      if (!status.providerConfigured) {
+        setError("Missing HF_API_BASE_URL — set the generation API origin on the server, then reload.");
+      } else if (status.serverKeyInvalid) {
+        setError("HF_API_KEY is malformed — it must be id:secret. Fix it on the server, then reload.");
+      } else if (!status.credential) {
+        setKeysOpen(true);
+      }
+    });
+  }, [refreshStudio]);
+
+  useEffect(() => {
     alive.current = true;
+    const timers = freshTimers.current;
     return () => {
       alive.current = false;
-      stopWatching();
-      for (const timer of freshTimers.current) clearTimeout(timer);
+      studioPoller.stop();
+      for (const timer of timers) clearTimeout(timer);
     };
+  }, []);
+
+  /* Turns a failure into the banner and, where a key would fix it, the modal. */
+  const serverKeyRef = useRef(serverKey);
+  useEffect(() => {
+    serverKeyRef.current = serverKey;
+  }, [serverKey]);
+  /* Stable on purpose: resume depends on it, and a new resume would restart
+     the refresh-path effect below. */
+  const reportFailure = useCallback((failure: Pick<ActionFailure, "error" | "code">) => {
+    if (failure.code && KEY_CODES.has(failure.code) && !serverKeyRef.current) setKeysOpen(true);
+    setError((prev) => prev ?? failure.error);
   }, []);
 
   /* Each arrival blooms on its own clock: a batch lands over several seconds,
@@ -252,38 +313,36 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
      found running rows already in the log. */
   const resume = useCallback(
     async (requestId: string, draft: RunDraft, expected: number) => {
+      let status: GenerationStatus;
       try {
-        const status = await watchRequest(requestId, {
-          deadline: draft.createdAt + POLL_DEADLINE_MS,
+        status = await studioPoller.watch(requestId, {
+          deadline: draft.createdAt + POLL_DEADLINE_MS[draft.surface],
         });
-        if (!alive.current) return;
-        const records = terminalRows(requestId, draft, status);
-        setHistory((prev) => {
-          const next = replaceRequest(prev, requestId, records);
-          void saveHistory(next);
-          return next;
-        });
-        markFresh(records.filter((record) => record.status === "completed").map((record) => record.id));
-        if (records.some((record) => record.status === "failed")) {
-          const failure = records[0]?.error ?? "the platform reported a failure";
-          setError(
-            (prev) =>
-              prev ?? `Run not delivered — ${failure}. Adjust the prompt or settings and retry.`,
-          );
-        }
       } catch (caught) {
         if (!alive.current) return;
-        const message = describeError(caught);
-        if (message.includes("platform key")) setKeysOpen(true);
-        setHistory((prev) => {
-          const next = replaceRequest(prev, requestId, failedRows(requestId, expected, draft, message));
-          void saveHistory(next);
-          return next;
-        });
-        setError((prev) => prev ?? message);
+        const failure =
+          caught instanceof WatchError
+            ? caught
+            : new WatchError("Lost track of the run. Reload to check on it.", "unknown");
+        /* Canceled means the studio stopped watching (unmount, or the tile was
+           deleted); the row is not failed, it is simply no longer ours. */
+        if (failure.code === "canceled") return;
+        setHistory((prev) =>
+          replaceRequest(prev, requestId, failedRows(requestId, expected, draft, failure.message)),
+        );
+        reportFailure({ error: failure.message, code: failure.code });
+        return;
+      }
+      if (!alive.current) return;
+      const records = terminalRows(requestId, draft, status);
+      setHistory((prev) => replaceRequest(prev, requestId, records));
+      markFresh(records.filter((record) => record.status === "completed").map((record) => record.id));
+      if (records.some((record) => record.status === "failed")) {
+        const failure = records[0]?.error ?? "The provider reported a failure.";
+        setError((prev) => prev ?? `Run not delivered — ${failure} Adjust the prompt or settings and retry.`);
       }
     },
-    [markFresh],
+    [markFresh, reportFailure],
   );
 
   /* After the log hydrates, pick up any request that was still on the platform
@@ -299,6 +358,7 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
       groups.set(record.requestId, rows);
     }
     for (const [requestId, rows] of groups) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resume only sets state once the provider answers
       void resume(requestId, draftOf(rows[0]!), rows.length);
     }
   }, [historyLoaded, resume]);
@@ -324,13 +384,24 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
      its own skeletons and keeps its own watch, so the composer is free the
      moment the tiles appear and any number of runs can be in flight. */
   const generate = useCallback(async () => {
-    if (!keyConfigured) {
+    if (!storesReady) return;
+    if (studio && !keyConfigured) {
       setKeysOpen(true);
-      setError("Add your platform key to generate.");
+      setError("No API key configured. Set HF_API_KEY on the server, or add a key in the studio.");
       return;
     }
     const plane = assemblePlane();
     if (!plane.prompt.text.trim()) return;
+    const signature = planeSignature(plane);
+    const now = Date.now();
+    if (
+      lastPress.current &&
+      lastPress.current.signature === signature &&
+      now - lastPress.current.at < DUPLICATE_PRESS_MS
+    ) {
+      return;
+    }
+    lastPress.current = { at: now, signature };
 
     const entry = getModel(plane.model);
     const ratio = ratioToCss(
@@ -377,30 +448,32 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
     setRuns((prev) => [...pending, ...prev]);
     galleryRef.current?.scrollTo({ top: 0, behavior: "smooth" });
 
+    const clearSlot = (slot: { skeletons: string[] }) =>
+      setRuns((prev) => prev.filter((active) => !slot.skeletons.includes(active.id)));
+
+    /* Never rejects: the submit action returns a result, callAction absorbs a
+       transport failure, and resume handles its own. */
     const runOne = async (slot: { skeletons: string[] }) => {
-      try {
-        const queued = await submitGeneration(plane);
-        setHistory((prev) => {
-          const next = [...runningRows(queued.requestId, slot.skeletons.length, draft), ...prev];
-          void saveHistory(next);
-          return next;
-        });
-        setRuns((prev) => prev.filter((active) => !slot.skeletons.includes(active.id)));
-        await resume(queued.requestId, draft, slot.skeletons.length);
-      } catch (caught) {
-        if (!alive.current) return;
-        const message = describeError(caught);
-        if (message.includes("platform key")) setKeysOpen(true);
-        setError((prev) => prev ?? message);
-      } finally {
-        if (alive.current) {
-          setRuns((prev) => prev.filter((active) => !slot.skeletons.includes(active.id)));
-        }
+      const result = await callAction(() => submitGeneration(plane));
+      if (!alive.current) return;
+      if (!result.ok) {
+        clearSlot(slot);
+        reportFailure(result);
+        return;
       }
+      const { requestId } = result.data;
+      /* One request, one set of rows: a second answer for the same id (a
+         retried delivery) replaces rather than stacks. */
+      setHistory((prev) => [
+        ...runningRows(requestId, slot.skeletons.length, draft),
+        ...prev.filter((record) => requestIdOf(record) !== requestId),
+      ]);
+      clearSlot(slot);
+      await resume(requestId, draft, slot.skeletons.length);
     };
 
     await Promise.all(slots.map(runOne));
-  }, [keyConfigured, resume]);
+  }, [storesReady, studio, keyConfigured, resume, reportFailure]);
 
   /* Reuse restores the whole plane the run was made from — model, its dials,
      then the words. A reuse that dropped the ratio and resolution would
@@ -434,20 +507,37 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
     setDeleted(records);
   }, []);
 
+  /* A running tile that comes back from the undo bar needs its watch back —
+     the terminal answer may have arrived (and been dropped) while it was gone,
+     or may still be on its way. watch() dedupes a request already watched. */
+  const resumeRestored = useCallback(
+    (records: RunRecord[]) => {
+      const groups = new Map<string, RunRecord[]>();
+      for (const record of records) {
+        if (record.status !== "running" || !record.requestId) continue;
+        groups.set(record.requestId, [...(groups.get(record.requestId) ?? []), record]);
+      }
+      for (const [requestId, rows] of groups) void resume(requestId, draftOf(rows[0]!), rows.length);
+    },
+    [resume],
+  );
+
   const deleteRun = useCallback((record: RunRecord) => deleteRuns([record]), [deleteRuns]);
 
   /* History is newest-first by construction, so the restored runs drop back
      into their own places rather than onto the top of the grid. */
   const restoreDeleted = useCallback(() => {
     if (!deleted) return;
+    const restored = deleted;
     setHistory((prev) => {
       const here = new Set(prev.map((entry) => entry.id));
-      const back = deleted.filter((entry) => !here.has(entry.id));
+      const back = restored.filter((entry) => !here.has(entry.id));
       if (back.length === 0) return prev;
       return [...prev, ...back].sort((a, b) => b.createdAt - a.createdAt);
     });
     setDeleted(null);
-  }, [deleted]);
+    resumeRestored(restored);
+  }, [deleted, resumeRestored]);
 
   useEffect(() => {
     if (!deleted) return;
@@ -486,17 +576,17 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
      or released from the shelf while the Favorites scope was the one on screen.
      The toolbar counts what the visitor can still see it acting on. */
   const visibleIds = useMemo(() => new Set(visible.map((record) => record.id)), [visible]);
-  useEffect(() => {
-    setSelected((prev) => {
-      const next = prev.filter((id) => visibleIds.has(id));
-      return next.length === prev.length ? prev : next;
-    });
-  }, [visibleIds]);
-
   /* Switching scope switches what "everything picked" means, so the selection
-     does not travel with it. */
+     does not travel with it. Both adjustments happen during render, so the
+     toolbar never paints a count for runs that are gone. */
+  const [selectionView, setSelectionView] = useState(view);
+  if (selectionView !== view) {
+    setSelectionView(view);
+    if (selected.length > 0) setSelected([]);
+  } else if (selected.some((id) => !visibleIds.has(id))) {
+    setSelected(selected.filter((id) => visibleIds.has(id)));
+  }
   useEffect(() => {
-    setSelected([]);
     rangeAnchor.current = null;
   }, [view]);
 
@@ -629,6 +719,7 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
             onView={switchView}
             busy={busy}
             keyConfigured={keyConfigured}
+            keySource={studio?.credential ?? null}
             onKeys={openKeys}
           />
 
@@ -653,6 +744,7 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
             surface={surface}
             model={model}
             generating={busy}
+            storage={studio?.storage ?? null}
             error={error}
             focusNonce={focusNonce}
             history={history}
@@ -700,14 +792,15 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
         {keysOpen && (
           <KeyModal
             configured={keyConfigured}
+            source={studio?.credential ?? null}
             onClose={() => setKeysOpen(false)}
             onSaved={() => {
-              setKeyConfigured(true);
               setKeysOpen(false);
               setError(null);
+              void refreshStudio();
             }}
             onCleared={() => {
-              setKeyConfigured(false);
+              void refreshStudio();
             }}
           />
         )}

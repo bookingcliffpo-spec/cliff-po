@@ -17,14 +17,24 @@ export function Topbar({
   onView,
   busy,
   keyConfigured,
+  keySource = null,
   onKeys,
 }: {
   view: GalleryView;
   onView: (next: GalleryView) => void;
   busy: boolean;
   keyConfigured: boolean;
+  /** "server" when HF_API_KEY is in use, "browser" for a key saved here. */
+  keySource?: "server" | "browser" | null;
   onKeys: () => void;
 }) {
+  const keyLabel = keySource === "server" ? "Server key" : keyConfigured ? "Your key" : "Add key";
+  const keyTitle =
+    keySource === "server"
+      ? "Using the server's HF_API_KEY"
+      : keyConfigured
+        ? "Edit platform key"
+        : "Add platform key";
   const tabsRef = useRef<HTMLDivElement>(null);
   const [thumb, setThumb] = useState<{ x: number; w: number } | null>(null);
 
@@ -130,11 +140,11 @@ export function Topbar({
           data-busy={busy}
           data-ready={keyConfigured}
           onClick={onKeys}
-          aria-label={keyConfigured ? "Edit platform key" : "Add platform key"}
-          title={keyConfigured ? "Edit platform key" : "Add platform key"}
+          aria-label={keyTitle}
+          title={keyTitle}
         >
           <KeyIcon />
-          <span className="ohf-key-text">{keyConfigured ? "Your key" : "Add key"}</span>
+          <span className="ohf-key-text">{keyLabel}</span>
           <span className="ohf-lamp" />
         </button>
       </div>

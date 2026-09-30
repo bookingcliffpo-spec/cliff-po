@@ -509,6 +509,7 @@ function Empty({
      wrote. Until the picks land the server's three hold their space unseen, so
      the invitation never jumps up the panel to make room for them. */
   const [samples, setSamples] = useState<string[] | null>(null);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- random picks must wait for mount, or hydration disagrees
   useEffect(() => setSamples(pickSamples(surface)), [surface]);
 
   return (

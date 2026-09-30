@@ -46,6 +46,7 @@ export function AssetPicker({
   history,
   staged,
   uploading,
+  progress = null,
   onUpload,
   onApply,
   onClose,
@@ -58,6 +59,7 @@ export function AssetPicker({
   history: RunRecord[];
   staged: string | null;
   uploading: boolean;
+  progress?: number | null;
   onUpload: (role: MediaRole) => void;
   onApply: (role: MediaRole, urls: string[]) => void;
   onClose: () => void;
@@ -143,15 +145,19 @@ export function AssetPicker({
     onClose();
   }
 
+  /* Reacts to an upload finishing elsewhere (the tray owns the file input);
+     the new URL is folded into this panel's selection once. */
   useEffect(() => {
     if (staged === null || staged === seen.current) return;
     seen.current = staged;
     if (max === 1) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- driven by an external upload completing
       setSelected([staged]);
       commit([staged]);
       return;
     }
     setSelected((prev) => (prev.includes(staged) ? prev : [...prev, staged]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per staged URL; commit/max are read at that moment
   }, [staged]);
 
   function toggle(url: string) {
@@ -184,7 +190,9 @@ export function AssetPicker({
   const empty = emptyCopy(shelf, kind);
   const canUpload = room > 0 && !uploading;
   const uploadTip = uploading
-    ? "Uploading…"
+    ? progress
+      ? `Uploading… ${Math.round(progress * 100)}%`
+      : "Uploading…"
     : room > 0
       ? `Upload a ${roleNoun(role, 1)} from this device`
       : `Every ${roleNoun(role, 1)} slot is taken — press one off to free it`;
@@ -301,7 +309,9 @@ export function AssetPicker({
                 onClick={() => onUpload(role)}
               >
                 {uploading ? <span className="ohf-spinner" aria-hidden /> : <UploadIcon size={17} />}
-                <span className="ohf-asset-upload-label">Upload file</span>
+                <span className="ohf-asset-upload-label">
+                  {uploading && progress ? `${Math.round(progress * 100)}%` : "Upload file"}
+                </span>
               </button>
             )}
 

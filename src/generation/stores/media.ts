@@ -21,6 +21,7 @@ function createMediaStore(name: string) {
       {
         name,
         storage: browserStorage(),
+        skipHydration: true,
         partialize: (state) => ({
           items: state.items.filter((item) => !item.url.startsWith("blob:")),
         }),
