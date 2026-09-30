@@ -61,7 +61,7 @@ describe("provider error parsing", () => {
   it("never echoes the credential back", () => {
     const error = providerError(422, { detail: `bad header Key ${API_KEY}` }, [API_KEY]);
     expect(error.message).not.toContain(API_KEY);
-    expect(error.message).not.toContain("sk_live_secret");
+    expect(error.message).not.toContain("fake_secret_value");
   });
 });
 
@@ -69,7 +69,7 @@ describe("redaction and serializable failures", () => {
   it("scrubs known secrets, Authorization values and id:secret pairs", () => {
     const text = `Authorization: Key ${API_KEY} Bearer abc.def.ghi123 other ${API_KEY.split(":")[1]}`;
     const clean = redact(text, [API_KEY]);
-    expect(clean).not.toContain("sk_live_secret");
+    expect(clean).not.toContain("fake_secret_value");
     expect(clean).not.toContain("abc.def.ghi123");
     expect(redact("Key rejected by server")).toBe("Key rejected by server");
   });

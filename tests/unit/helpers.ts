@@ -1,4 +1,4 @@
-export const API_KEY = "key_id_1234:sk_live_secret_abcdefghijklmnop";
+export const API_KEY = "key_id_1234:fake_secret_value_abcdefghijklmnop";
 
 export type Call = { url: string; method: string; headers: Record<string, string>; body: unknown };
 

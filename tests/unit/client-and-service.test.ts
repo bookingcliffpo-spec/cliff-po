@@ -136,7 +136,7 @@ describe("submit (service)", () => {
       code: "invalid_api_key",
       status: 401,
     });
-    expect(JSON.stringify(result)).not.toContain("sk_live_secret");
+    expect(JSON.stringify(result)).not.toContain("fake_secret_value");
   });
 
   it("returns an insufficient-balance failure", async () => {
@@ -195,7 +195,7 @@ describe("submit (service)", () => {
     }) as unknown as typeof fetch;
     const result = await submitPlane(soulPlane, { env: ENV, fetch: impl, logger: null });
     expect(result.ok).toBe(false);
-    expect(JSON.stringify(result)).not.toContain("sk_live_secret");
+    expect(JSON.stringify(result)).not.toContain("fake_secret_value");
   });
 });
 
