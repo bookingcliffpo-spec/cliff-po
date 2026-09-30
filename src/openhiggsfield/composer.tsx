@@ -58,6 +58,7 @@ export function Composer({
   model,
   generating,
   storage = null,
+  isAvailable,
   error,
   focusNonce,
   history,
@@ -72,6 +73,8 @@ export function Composer({
   generating: boolean;
   /** Which upload driver the server has configured, or null for none. */
   storage?: StorageDriver | null;
+  /** Which models the server can run; the picker offers only those. */
+  isAvailable?: (model: ModelEntry) => boolean;
   error: string | null;
   focusNonce: number;
   /* Finished runs are attachable inputs, so the asset picker reads the same
@@ -268,6 +271,7 @@ export function Composer({
           <ModelPicker
             selectedId={model.id}
             surface={surface}
+            isAvailable={isAvailable}
             onPick={(next) => {
               setModel(next.id);
               setOverlay(null);

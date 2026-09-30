@@ -10,12 +10,14 @@ import { CloseIcon } from "./icons";
 export function KeyModal({
   configured,
   source = null,
+  freeMode = false,
   onClose,
   onSaved,
   onCleared,
 }: {
   configured: boolean;
   source?: "server" | "browser" | null;
+  freeMode?: boolean;
   onClose: () => void;
   onSaved: () => void;
   onCleared: () => void;
@@ -88,6 +90,8 @@ export function KeyModal({
                 ? "This studio uses the server's HF_API_KEY. It is never sent to the browser; change it in the server environment."
                 : configured
                   ? "A key is saved in this browser. Enter a new id:secret pair to replace it."
+                  : freeMode
+                    ? "You're in free mode: the free image models work with no key. To unlock the paid image and video models, paste a platform key as id:secret — it stays in an httpOnly cookie."
                   : "Paste your platform key as id:secret. It stays in an httpOnly cookie and is sent as Authorization: Key id:secret. To use a server key instead, set HF_API_KEY."}
             </p>
           </div>

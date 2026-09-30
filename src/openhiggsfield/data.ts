@@ -88,6 +88,7 @@ const SETTING_LABELS: Record<string, string> = {
   multiShots: "Multi-shot",
   keepOriginalSound: "Keep original sound",
   characterOrientation: "Orientation",
+  steps: "Steps",
 };
 
 /* A pill carries one word; "Generate audio" is a panel label, not a control on
@@ -236,8 +237,17 @@ export function describeModel(model: ModelEntry): string {
   const duration = model.settings.duration;
   if (duration?.type === "range") limits.push(`${duration.min}–${duration.max}s`);
 
-  return limits.length ? `${source} · ${limits.join(", ")}` : source;
+  const tail = FREE_NOTES[model.provider ?? "higgsfield"];
+  const base = limits.length ? `${source} · ${limits.join(", ")}` : source;
+  return tail ? `${base} · ${tail}` : base;
 }
+
+/* Keyless models say so in the picker, and the demo says what it is not. */
+const FREE_NOTES: Record<string, string | undefined> = {
+  pollinations: "free, no API key (Pollinations, rate-limited)",
+  "local-sd": "free on your own GPU",
+  demo: "offline placeholder art, not AI",
+};
 
 /* Keys that already mean "results per request". The composer shows one batch
    control whatever the model is: where the catalog declares one of these it

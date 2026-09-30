@@ -18,6 +18,7 @@ export function Topbar({
   busy,
   keyConfigured,
   keySource = null,
+  freeMode = false,
   onKeys,
 }: {
   view: GalleryView;
@@ -26,15 +27,20 @@ export function Topbar({
   keyConfigured: boolean;
   /** "server" when HF_API_KEY is in use, "browser" for a key saved here. */
   keySource?: "server" | "browser" | null;
+  /** No key, but keyless models are available. */
+  freeMode?: boolean;
   onKeys: () => void;
 }) {
-  const keyLabel = keySource === "server" ? "Server key" : keyConfigured ? "Your key" : "Add key";
+  const keyLabel =
+    keySource === "server" ? "Server key" : keyConfigured ? "Your key" : freeMode ? "Free mode" : "Add key";
   const keyTitle =
     keySource === "server"
       ? "Using the server's HF_API_KEY"
       : keyConfigured
         ? "Edit platform key"
-        : "Add platform key";
+        : freeMode
+          ? "Free mode — no API key. Add a key to unlock paid models"
+          : "Add platform key";
   const tabsRef = useRef<HTMLDivElement>(null);
   const [thumb, setThumb] = useState<{ x: number; w: number } | null>(null);
 
@@ -138,7 +144,7 @@ export function Topbar({
           type="button"
           className="ohf-key"
           data-busy={busy}
-          data-ready={keyConfigured}
+          data-ready={keyConfigured || freeMode}
           onClick={onKeys}
           aria-label={keyTitle}
           title={keyTitle}

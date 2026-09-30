@@ -14,11 +14,13 @@ import { ModelIcon, modelIconSrc } from "./model-icon";
 export function ModelPicker({
   selectedId,
   surface,
+  isAvailable = () => true,
   onPick,
   onClose,
 }: {
   selectedId: string;
   surface: Surface;
+  isAvailable?: (model: ModelEntry) => boolean;
   onPick: (model: ModelEntry) => void;
   onClose: () => void;
 }) {
@@ -31,7 +33,7 @@ export function ModelPicker({
   }, []);
 
   const query = search.trim().toLowerCase();
-  const catalog = MODELS.filter((model) => model.surface === surface);
+  const catalog = MODELS.filter((model) => model.surface === surface && isAvailable(model));
   /* The description is searchable too: "references", "4K" and "audio" are how
      a visitor asks for a model whose name they do not remember. */
   const models = catalog.filter(

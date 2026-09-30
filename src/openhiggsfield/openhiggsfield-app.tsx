@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getStudioStatus, submitGeneration, type StudioStatus } from "@/generation/actions";
-import { MODELS, findModel, getModel } from "@/generation/catalog";
+import { MODELS, findModel, getModel, providerOf } from "@/generation/catalog";
+import type { ModelEntry } from "@/generation/catalog";
 import type { Surface } from "@/generation/catalog";
 import type { GenerationStatus } from "@/generation/higgsfield/types";
 import { assemblePlane } from "@/generation/plane";
@@ -202,6 +203,14 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
   const [studio, setStudio] = useState<StudioStatus | null>(null);
   const [keysOpen, setKeysOpen] = useState(false);
   const keyConfigured = studio?.credential != null;
+  /* Until the server answers every model is offered; after, only those whose
+     provider is available — with no key that is the free models alone. */
+  const providers = studio?.providers ?? null;
+  const isAvailable = useCallback(
+    (entry: ModelEntry) => providers === null || providers.includes(providerOf(entry)),
+    [providers],
+  );
+  const freeMode = providers !== null && !keyConfigured && providers.some((id) => id !== "higgsfield");
   const serverKey = studio?.credential === "server";
 
   const galleryRef = useRef<HTMLDivElement>(null);
@@ -265,15 +274,29 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
     // eslint-disable-next-line react-hooks/set-state-in-effect -- state is set after the server answers, not synchronously
     void refreshStudio().then((status) => {
       if (!status) return;
-      if (!status.providerConfigured) {
-        setError("Missing HF_API_BASE_URL — set the generation API origin on the server, then reload.");
-      } else if (status.serverKeyInvalid) {
+      const hasFree = status.providers.some((id) => id !== "higgsfield");
+      if (status.serverKeyInvalid) {
         setError("HF_API_KEY is malformed — it must be id:secret. Fix it on the server, then reload.");
-      } else if (!status.credential) {
+      } else if (status.providers.length === 0) {
+        setError(
+          "No generation provider is enabled. Set HF_API_BASE_URL, or turn on the free providers (FREE_PROVIDERS), then reload.",
+        );
+      } else if (!status.credential && !hasFree) {
         setKeysOpen(true);
       }
     });
   }, [refreshStudio]);
+
+  /* The saved or default model may be one this server cannot run (a paid
+     model with no key): move to the first available model, on the same
+     surface when there is one. */
+  useEffect(() => {
+    if (!storesReady || providers === null || isAvailable(model)) return;
+    const next =
+      MODELS.find((entry) => entry.surface === model.surface && isAvailable(entry)) ??
+      MODELS.find((entry) => isAvailable(entry));
+    if (next) setModel(next.id);
+  }, [storesReady, providers, model, isAvailable, setModel]);
 
   useEffect(() => {
     alive.current = true;
@@ -374,10 +397,15 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
       setView(next);
       galleryRef.current?.scrollTo({ top: 0 });
       if (CROSS_VIEWS.has(next) || next === surface) return;
-      const first = MODELS.find((entry) => entry.surface === next);
+      const first = MODELS.find((entry) => entry.surface === next && isAvailable(entry));
       if (first) setModel(first.id);
+      else if (next === "video") {
+        setError(
+          "Video needs a provider key — there is no free video model. Add HF_API_KEY (or a key in the studio) to generate video.",
+        );
+      }
     },
-    [setModel, surface],
+    [setModel, surface, isAvailable],
   );
 
   /* Presses do not wait on each other. A press snapshots its own plane, opens
@@ -385,9 +413,10 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
      moment the tiles appear and any number of runs can be in flight. */
   const generate = useCallback(async () => {
     if (!storesReady) return;
-    if (studio && !keyConfigured) {
+    const pressed = findModel(useActive.getState().model);
+    if (studio && !keyConfigured && pressed && providerOf(pressed) === "higgsfield") {
       setKeysOpen(true);
-      setError("No API key configured. Set HF_API_KEY on the server, or add a key in the studio.");
+      setError("This model needs an API key. Pick a free model, set HF_API_KEY on the server, or add a key in the studio.");
       return;
     }
     const plane = assemblePlane();
@@ -462,6 +491,15 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
         return;
       }
       const { requestId } = result.data;
+      /* Keyless providers finish inside the submit: the result lands at once,
+         with nothing to poll. */
+      if (result.data.result) {
+        const records = terminalRows(requestId, draft, result.data.result);
+        setHistory((prev) => [...records, ...prev.filter((record) => requestIdOf(record) !== requestId)]);
+        clearSlot(slot);
+        markFresh(records.filter((record) => record.status === "completed").map((record) => record.id));
+        return;
+      }
       /* One request, one set of rows: a second answer for the same id (a
          retried delivery) replaces rather than stacks. */
       setHistory((prev) => [
@@ -473,7 +511,7 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
     };
 
     await Promise.all(slots.map(runOne));
-  }, [storesReady, studio, keyConfigured, resume, reportFailure]);
+  }, [storesReady, studio, keyConfigured, resume, reportFailure, markFresh]);
 
   /* Reuse restores the whole plane the run was made from — model, its dials,
      then the words. A reuse that dropped the ratio and resolution would
@@ -720,6 +758,7 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
             busy={busy}
             keyConfigured={keyConfigured}
             keySource={studio?.credential ?? null}
+            freeMode={freeMode}
             onKeys={openKeys}
           />
 
@@ -744,6 +783,7 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
             surface={surface}
             model={model}
             generating={busy}
+            isAvailable={isAvailable}
             storage={studio?.storage ?? null}
             error={error}
             focusNonce={focusNonce}
@@ -793,6 +833,7 @@ export function OpenHiggsfieldApp({ fontClassName = "" }: { fontClassName?: stri
           <KeyModal
             configured={keyConfigured}
             source={studio?.credential ?? null}
+            freeMode={freeMode}
             onClose={() => setKeysOpen(false)}
             onSaved={() => {
               setKeysOpen(false);

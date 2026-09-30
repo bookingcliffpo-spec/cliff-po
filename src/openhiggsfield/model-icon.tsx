@@ -4,7 +4,7 @@ import type { CSSProperties } from "react";
 export function modelIconFile(id: string): string | undefined {
   if (id.startsWith("kling")) return "kling";
   if (id.startsWith("wan")) return "wan";
-  if (id.startsWith("flux")) return "flux";
+  if (id.startsWith("flux") || id === "free-flux") return "flux";
   if (id.startsWith("grok")) return "grok";
   if (id.startsWith("happy-horse")) return "happy-horse";
   if (id.startsWith("minimax")) return "minimax";
