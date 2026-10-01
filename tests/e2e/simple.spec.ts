@@ -25,7 +25,7 @@ async function bridgeLast(): Promise<{ settings: Record<string, unknown> }> {
 }
 
 async function open(page: Page) {
-  await page.goto("/");
+  await page.goto("/simple");
   await expect(page.getByLabel("Model", { exact: true })).toHaveValue("video-free");
 }
 

@@ -28,7 +28,7 @@ for (const device of DEVICES) {
         if (res.url().includes("/api/supabase/sign")) signed.push(await res.text());
       });
 
-      await page.goto("/");
+      await page.goto("/simple");
       const drop = page.getByRole("button", { name: "Upload images or a video" });
       await expect(drop).not.toContainText("work when your computer runs the studio");
 

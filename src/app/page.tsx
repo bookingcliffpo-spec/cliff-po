@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 
-import { SimpleStudio } from "@/simple/simple-studio";
+import { MotionStudio } from "@/motion/motion-studio";
 
-import "@/simple/simple.css";
+import "@/motion/motion.css";
 
 const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-sp-inter",
+  variable: "--font-mo-inter",
   display: "swap",
 });
 
@@ -15,8 +15,9 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
 
-/** Upload → prompt → Generate. Everything else lives under "More settings",
-    and the full studio is at /studio. */
+/** The phone-first home page: model card, prompt, Settings · Media · Upload,
+    Generate, and the jobs list. /simple keeps the one-card page and /studio
+    the full studio. */
 export default function HomePage() {
-  return <SimpleStudio fontClassName={inter.variable} />;
+  return <MotionStudio fontClassName={inter.variable} />;
 }

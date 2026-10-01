@@ -17,11 +17,15 @@ reuse/retry, download, delete + undo — is kept as upstream built it.
 
 ## The simple way to use it
 
-The home page is just: **upload images or a video → type a prompt → pick
-model, duration and aspect ratio → Generate.** Results land below and stay in
-your browser. Everything else (start/end frame, motion transfer, character /
-object swap, restyle, audio reference, image roles, cinematic looks, quality)
-is folded under **More settings**. The full studio is at `/studio`.
+The home page (`/`) is built for phones: **Jobs · Video · Image · Assets**
+tabs, a model card, the prompt, then **Settings** (aspect ratio, resolution,
+duration, audio, cinematic look), **Media** (start/end frame, audio reference,
+image roles, what to do with an uploaded video) and **Upload**. Generate takes
+a batch size (1–4×) and running jobs show progress with Cancel; finished
+results land in Video and Image and stay in your browser.
+
+`/simple` is the same engine as a single card (upload → prompt → Generate,
+the rest under **More settings**). The full studio is at `/studio`.
 
 **Free video, on your computer** — the model runs on your PC and your phone
 uses it over Wi-Fi:

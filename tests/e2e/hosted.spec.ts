@@ -7,7 +7,7 @@ test.use({ baseURL: "http://127.0.0.1:3300", httpCredentials: undefined });
 test("uploads explain how to get free video instead of erroring", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
-  await page.goto("/");
+  await page.goto("/simple");
   await expect(page.getByLabel("Model", { exact: true })).toHaveValue("image-free");
   const drop = page.getByRole("button", { name: "Upload images or a video" });
   await expect(drop).toContainText("Photos & videos work when your computer runs the studio");
