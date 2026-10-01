@@ -722,6 +722,12 @@ export function SimpleStudio({ fontClassName = "" }: { fontClassName?: string })
               </li>
               <li>Open the address it prints on your phone or any computer on the same Wi-Fi — uploads then go straight to your PC.</li>
             </ol>
+            {uploadsOff && (
+              <p className="sp-note">
+                Site owner: turn on uploads here in Vercel → this project → Storage → Create → Blob (Public access) →
+                Connect, then redeploy. Blob has a free tier.
+              </p>
+            )}
             <p className="sp-note">
               Prefer not to run anything? Video from photos is also possible with a Higgsfield key (paid credits) —
               that needs the site owner to add it and upload storage.
