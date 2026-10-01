@@ -4,25 +4,31 @@ import { GenerationError } from "../errors";
 
 type Env = Record<string, string | undefined>;
 
-export type StorageDriver = "vercel-blob" | "local" | "wangp";
+export type StorageDriver = "vercel-blob" | "supabase" | "local" | "wangp";
 
 export type StorageConfig =
   | { driver: "vercel-blob"; token: string }
+  | { driver: "supabase"; url: string; key: string; bucket: string }
   | { driver: "wangp" }
   | { driver: "local"; dir: string; publicBaseUrl: string };
 
-/** Where uploads go. Two drivers:
+/** Where uploads go. Drivers:
 
     - vercel-blob: client-direct uploads to Vercel Blob. Needs a read-write
       token (OPEN_HIGGSFIELD_READ_WRITE_TOKEN, or Vercel's own
       BLOB_READ_WRITE_TOKEN).
+    - supabase: client-direct uploads to a public Supabase Storage bucket
+      through signed upload URLs. Needs SUPABASE_URL and
+      SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY); the bucket
+      (SUPABASE_BUCKET, default studio-uploads) is created on first use.
     - local: files are written to LOCAL_UPLOAD_DIR on this server and served
       from /api/media. Free and self-hostable, but only works on a long-lived
       server with a disk (not serverless) and PUBLIC_BASE_URL must be an origin
       the provider can reach.
 
-    STORAGE_DRIVER picks one explicitly; unset, Blob is used when its token is
-    present. Returns null when nothing is configured. */
+    STORAGE_DRIVER picks one explicitly; unset, the first configured of Blob,
+    Supabase and the WanGP bridge is used. Returns null when nothing is
+    configured. */
 export function readStorageConfig(env: Env = process.env): StorageConfig | null {
   const explicit = env.STORAGE_DRIVER?.trim().toLowerCase();
   const token = (env.OPEN_HIGGSFIELD_READ_WRITE_TOKEN || env.BLOB_READ_WRITE_TOKEN || "").trim();
@@ -57,6 +63,32 @@ export function readStorageConfig(env: Env = process.env): StorageConfig | null 
     return { driver: "vercel-blob", token };
   }
 
+  /* Supabase Storage, as set up by Vercel's Supabase integration: the
+     project URL plus its service-role (or secret) key, both server-side. */
+  const supabaseUrl = (env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
+  const supabaseKey = (env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SECRET_KEY || "").trim();
+  if (explicit === "supabase" || (!explicit && supabaseUrl && supabaseKey)) {
+    if (!supabaseUrl || !supabaseKey) {
+      throw new GenerationError(
+        "missing_config",
+        "STORAGE_DRIVER=supabase needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY).",
+      );
+    }
+    let url: string;
+    try {
+      const parsed = new URL(supabaseUrl);
+      if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error("protocol");
+      url = parsed.origin;
+    } catch {
+      throw new GenerationError("missing_config", "SUPABASE_URL is not a valid http(s) URL.");
+    }
+    const bucket = (env.SUPABASE_BUCKET || "studio-uploads").trim();
+    if (!/^[a-z0-9][a-z0-9._-]{1,62}$/.test(bucket)) {
+      throw new GenerationError("missing_config", "SUPABASE_BUCKET may only use lowercase letters, digits, '.', '_' and '-'.");
+    }
+    return { driver: "supabase", url, key: supabaseKey, bucket };
+  }
+
   /* The free local setup: with WanGP connected and nothing else configured,
      uploads are kept by the WanGP bridge on the same machine — no storage
      account needed. Only WanGP models can read them. */
@@ -68,7 +100,7 @@ export function readStorageConfig(env: Env = process.env): StorageConfig | null 
   }
 
   if (explicit) {
-    throw new GenerationError("missing_config", "STORAGE_DRIVER must be 'vercel-blob', 'local' or 'wangp'.");
+    throw new GenerationError("missing_config", "STORAGE_DRIVER must be 'vercel-blob', 'supabase', 'local' or 'wangp'.");
   }
   return null;
 }
@@ -90,7 +122,7 @@ export function requireStorage(env: Env = process.env): StorageConfig {
   if (!config) {
     throw new GenerationError(
       "missing_config",
-      "Uploads are not configured. Set OPEN_HIGGSFIELD_READ_WRITE_TOKEN (Vercel Blob) or STORAGE_DRIVER=local with PUBLIC_BASE_URL.",
+      "Uploads are not configured. Set OPEN_HIGGSFIELD_READ_WRITE_TOKEN (Vercel Blob), SUPABASE_URL with SUPABASE_SERVICE_ROLE_KEY, or STORAGE_DRIVER=local with PUBLIC_BASE_URL.",
     );
   }
   return config;

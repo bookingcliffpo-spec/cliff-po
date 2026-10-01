@@ -29,7 +29,7 @@ export async function uploadMedia(file: File, options: UploadOptions): Promise<{
   if (problem) throw new UploadError(problem);
   if (!options.driver) {
     throw new UploadError(
-      "Uploads aren't available here — this server has nowhere to keep files. Run the free studio on your computer (uploads go to your PC), or add upload storage (OPEN_HIGGSFIELD_READ_WRITE_TOKEN or STORAGE_DRIVER=local).",
+      "Uploads aren't available here — this server has nowhere to keep files. Run the free studio on your computer (uploads go to your PC), or add upload storage (Vercel Blob, Supabase, or STORAGE_DRIVER=local).",
     );
   }
   const { url } =
@@ -37,7 +37,9 @@ export async function uploadMedia(file: File, options: UploadOptions): Promise<{
       ? await uploadLocal(file, options, "/api/upload")
       : options.driver === "wangp"
         ? await uploadLocal(file, options, "/api/wangp/upload")
-        : await uploadBlob(file, options);
+        : options.driver === "supabase"
+          ? await uploadSupabase(file, options)
+          : await uploadBlob(file, options);
   /* Private hosts are allowed here: whether the provider can reach them is the
      submit action's call, which knows the server's settings. Files kept by the
      WanGP bridge are addressed by a studio path. */
@@ -96,6 +98,60 @@ async function uploadBlob(file: File, options: UploadOptions): Promise<{ url: st
         : "Upload failed — the file could not be sent to storage. Check your connection and retry.",
     );
   }
+}
+
+async function uploadSupabase(file: File, options: UploadOptions): Promise<{ url: string }> {
+  let res: Response;
+  try {
+    res = await fetch("/api/supabase/sign", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ contentType: file.type, size: file.size }),
+      signal: options.signal,
+    });
+  } catch {
+    if (options.signal?.aborted) throw new UploadError("Upload canceled.");
+    throw new UploadError("Upload failed — could not reach the studio server.");
+  }
+  const json = (await res.json().catch(() => null)) as {
+    uploadUrl?: unknown;
+    publicUrl?: unknown;
+    error?: unknown;
+  } | null;
+  if (!res.ok || typeof json?.uploadUrl !== "string" || typeof json.publicUrl !== "string") {
+    throw new UploadError(
+      typeof json?.error === "string" ? json.error : `Upload failed — the server refused the upload (${res.status}).`,
+    );
+  }
+  await sendFile(file, options, "PUT", json.uploadUrl, (status) =>
+    status === 413
+      ? "Upload failed — the file is larger than the storage allows (Supabase's free plan takes up to 50 MB per file)."
+      : `Upload failed — storage refused the file (${status}).`,
+  );
+  return { url: json.publicUrl };
+}
+
+/** PUTs the raw file to a signed URL, reporting progress. */
+function sendFile(
+  file: File,
+  options: UploadOptions,
+  method: string,
+  url: string,
+  refusal: (status: number) => string,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, url);
+    xhr.setRequestHeader("content-type", file.type);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) options.onProgress?.(Math.min(0.99, event.loaded / event.total));
+    };
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new UploadError(refusal(xhr.status))));
+    xhr.onerror = () => reject(new UploadError("Upload failed — the file could not be sent to storage. Check your connection and retry."));
+    xhr.onabort = () => reject(new UploadError("Upload canceled."));
+    options.signal?.addEventListener("abort", () => xhr.abort(), { once: true });
+    xhr.send(file);
+  });
 }
 
 /** XMLHttpRequest rather than fetch: it is the only browser API that reports

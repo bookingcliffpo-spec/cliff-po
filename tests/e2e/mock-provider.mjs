@@ -14,6 +14,13 @@ const PNG = Buffer.from(
 );
 
 const calls = [];
+const SUPABASE_KEY = "e2e_supabase_key";
+const stored = new Map();
+const CORS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET, POST, PUT, OPTIONS",
+  "access-control-allow-headers": "authorization, apikey, content-type, x-upsert",
+};
 const requests = new Map();
 let seq = 0;
 
@@ -43,6 +50,46 @@ async function fetchable(url) {
   }
 }
 
+async function supabase(req, res, url) {
+  const path = url.pathname.slice("/storage/v1".length);
+  const json = (status, body) => {
+    res.writeHead(status, { ...CORS, "content-type": "application/json" });
+    res.end(JSON.stringify(body));
+  };
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, CORS);
+    return res.end();
+  }
+  if (req.method === "GET" && path === "/__uploads") {
+    return json(200, [...stored].map(([key, file]) => ({ key, type: file.type, size: file.bytes.length })));
+  }
+  if (req.method === "POST") {
+    await readBody(req);
+    if (req.headers.apikey !== SUPABASE_KEY || req.headers.authorization !== `Bearer ${SUPABASE_KEY}`) {
+      return json(403, { message: "Invalid key" });
+    }
+    if (path === "/bucket") return json(200, { name: "studio-uploads" });
+    const sign = path.match(/^\/object\/upload\/sign\/(.+)$/);
+    if (sign) return json(200, { url: `/object/upload/sign/${sign[1]}?token=e2e-one-time` });
+  }
+  if (req.method === "PUT") {
+    const target = path.match(/^\/object\/upload\/sign\/(.+)$/);
+    if (!target || url.searchParams.get("token") !== "e2e-one-time") return json(400, { message: "bad token" });
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    stored.set(target[1], { type: req.headers["content-type"], bytes: Buffer.concat(chunks) });
+    return json(200, { Key: target[1] });
+  }
+  if (req.method === "GET") {
+    const file = stored.get(path.replace(/^\/object\/public\//, ""));
+    if (file) {
+      res.writeHead(200, { ...CORS, "content-type": file.type });
+      return res.end(file.bytes);
+    }
+  }
+  return json(404, { message: "not found" });
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, ORIGIN);
 
@@ -56,6 +103,10 @@ const server = http.createServer(async (req, res) => {
     requests.clear();
     return send(res, 200, { ok: true });
   }
+
+  // Supabase Storage stand-in: bucket creation and signing need the server
+  // key; the browser PUTs to the signed URL with only its one-time token.
+  if (url.pathname.startsWith("/storage/v1/")) return supabase(req, res, url);
 
   const body = req.method === "POST" ? await readBody(req) : null;
 

@@ -6,6 +6,7 @@ const APP_PORT = 3100;
 const MOCK_PORT = 4010;
 export const FREE_PORT = 3200;
 export const HOSTED_PORT = 3300;
+export const SUPABASE_APP_PORT = 3400;
 export const BRIDGE_PORT = 7871;
 const BRIDGE_TOKEN = "e2e-bridge-token";
 const API_KEY = "e2e_id:e2e_secret_value_123456";
@@ -91,6 +92,23 @@ export default defineConfig({
       timeout: 120_000,
       reuseExistingServer: false,
       env: { HF_API_BASE_URL: "", HF_API_KEY: "", APP_PASSWORD: "", WANGP_URL: "", STORAGE_DRIVER: "", LOCAL_SD_URL: "" },
+    },
+    {
+      /* The hosted site with Vercel's Supabase integration connected. */
+      command: `pnpm start -p ${SUPABASE_APP_PORT}`,
+      url: `http://127.0.0.1:${SUPABASE_APP_PORT}/api/health`,
+      timeout: 120_000,
+      reuseExistingServer: false,
+      env: {
+        HF_API_BASE_URL: "",
+        HF_API_KEY: "",
+        APP_PASSWORD: "",
+        WANGP_URL: "",
+        STORAGE_DRIVER: "",
+        LOCAL_SD_URL: "",
+        SUPABASE_URL: `http://127.0.0.1:${MOCK_PORT}`,
+        SUPABASE_SERVICE_ROLE_KEY: "e2e_supabase_key",
+      },
     },
   ],
 });

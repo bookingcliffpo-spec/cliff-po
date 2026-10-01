@@ -199,7 +199,8 @@ All variables are server-only. None is exposed to the browser.
 | `HF_API_KEY` | for paid models | Server key, `id:secret`, sent as `Authorization: Key <id:secret>`. Wins over a key saved in the browser. Leave empty to let each visitor paste their own key. |
 | `APP_PASSWORD` | when public | HTTP Basic auth for the whole studio (any username). **Set this whenever `HF_API_KEY` is set on a reachable deployment.** `/api/media/*` and `/api/health` stay public. |
 | `OPEN_HIGGSFIELD_READ_WRITE_TOKEN` or `BLOB_READ_WRITE_TOKEN` | for uploads (Blob) | Vercel Blob read-write token. |
-| `STORAGE_DRIVER` | optional | `vercel-blob` or `local`. Unset: Blob when its token is present. |
+| `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_SECRET_KEY`) | for uploads (Supabase) | Set by Vercel's Supabase integration. Server-side only. `SUPABASE_BUCKET` defaults to `studio-uploads`. |
+| `STORAGE_DRIVER` | optional | `vercel-blob`, `supabase`, `local` or `wangp`. Unset: the first configured of Blob, Supabase, WanGP. |
 | `PUBLIC_BASE_URL` | for `local` | Public origin the provider fetches uploads from, e.g. `https://studio.example.com`. |
 | `LOCAL_UPLOAD_DIR` | optional | Directory for `local` uploads (default `.uploads`). |
 | `ALLOW_PRIVATE_MEDIA_URLS` | dev only | `true` allows localhost/private media URLs (for a mock provider). The real provider cannot fetch them. |
@@ -212,6 +213,11 @@ publicly reachable URLs — `blob:` previews are never sent.
 
 - **Vercel Blob** — browser uploads directly to Blob with a token the server
   scopes to one content type and that type's size cap. Works on serverless.
+- **Supabase Storage** — the server asks Supabase for a one-time signed upload
+  URL (creating the public bucket on first use) and the browser PUTs the file
+  straight to it; the service key never reaches the page. Works on serverless.
+  Supabase's free plan caps files at 50 MB, so long videos need Blob or a paid
+  plan.
 - **Local disk** (`STORAGE_DRIVER=local`) — the browser sends the file to
   `/api/upload`, the server streams it to `LOCAL_UPLOAD_DIR` under a random
   128-bit name and serves it from `/api/media/<name>`. Free; needs a long-lived
@@ -229,8 +235,9 @@ Accepted inputs: JPEG/PNG/WebP/GIF images up to 20 MB, MP4 video up to
 
 1. Import the repository in Vercel (framework: Next.js; install `pnpm install`,
    build `pnpm build`).
-2. Create a Blob store (Storage → Blob) and connect it to the project; that sets
-   `BLOB_READ_WRITE_TOKEN`.
+2. Create a Blob store (Storage → Blob, public) and connect it to the project;
+   that sets `BLOB_READ_WRITE_TOKEN`. Or connect Supabase from the same Storage
+   tab; that sets `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
 3. Add environment variables (Production and Preview): `HF_API_BASE_URL`,
    `HF_API_KEY`, `APP_PASSWORD`.
 4. Deploy, then open `https://<deployment>/api/health` — both values should be
